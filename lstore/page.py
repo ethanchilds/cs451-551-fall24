@@ -13,7 +13,7 @@ from config import Config
 from errors import PageNoCapacityError, PageValueTooLargeError, PageKeyError
 
 class Page:
-
+    # DANIEL QUESTION why dont we inherit size of the column data type we are using as the cell_size?
     def __init__(self, page_size=Config.page_size, cell_size=Config.page_cell_size):
         self.num_cells = 0
         self.data = bytearray(page_size)
@@ -34,6 +34,7 @@ class Page:
         if not self.has_capacity():
             raise PageNoCapacityError
 
+        # DANIEL QUESTION are we sure len is correct here? maybe sys.getsizeof ???
         if len(value) > self.cell_size:      # Consider if this should be len(value) != self.cell_size instead
             raise PageValueTooLargeError
         

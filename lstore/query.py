@@ -44,14 +44,18 @@ class Query:
         # as is, this SHOULD insert a new record, however, this needs to be tested first
 
         schema_encoding = '0' * self.table.num_columns
+        # DANIEL what does this mean??? (next 3 lines)
         page_rid = self.table.page_directory['RID'][0]
         page_schema = self.table.page_directory['schema'][0]
-        page_inderection = self.table.page_directory['inderection'][0]
+        page_indirection = self.table.page_directory['indirection'][0]
 
+        # DANIEL are we having ordered number of the record as rid? sounds good, just wanna clarify 
+
+        # DANIEL need to consider the case with many pages
         rid = 'b' + str(page_rid.num_cells + 1)
         page_rid.write(rid)
         page_schema(schema_encoding)
-        page_inderection.write(None)
+        page_indirection.write(None)
         
         for i in range(self.table.num_columns):
             base_page = self.table.page_directory[i][0]
@@ -69,7 +73,7 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+        return self.select_version(search_key, search_key_index, projected_columns_index, 0)
 
     
     """
@@ -83,7 +87,18 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+        # general idea:
+        # if there is an index for this column:
+        #     use index to find rids
+        # else:
+        #     use linear iteration through rid page directory to find corresponding rid's
+        # for each found rid construct a Record object:
+        #   go to final version of record with specified rid and get all the column values
+        #   for _ in range(relative_version)
+        #       go to the previous version of the record using pointer to prev version
+
         pass
+
 
     
     """
@@ -92,6 +107,14 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+        # general idea
+        # use index to find rid
+        # append the new record version to the tail page 
+        # update schema for base and tail records
+        # DANIEL QUESTION: do we even need schema for now? I dont seem to understand where is it used?
+        # Update indirection column for latest tail version and for base record
+        # DANIEL QUESTION WHAT SERVES AS PTR? Do we need another id for specific record in memory? to distinguish between tail and base records
+
         pass
 
     

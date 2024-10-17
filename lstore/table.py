@@ -41,11 +41,13 @@ class Table:
 
         # Very rough implementaion of base and tail coupling, consider changing later
         for i in range(num_columns):
+            # DANIEL COMMENT maybe {'Base': [Page(), ... ], 'Tail': [Page(), ... ]}
             self.page_directory[i] = [Page(), Page()]
 
         self.page_directory['RID'] = [Page(), Page()]
-        self.page_directory['inderection'] = [Page(), Page()]
+        self.page_directory['indirection'] = [Page(), Page()]
         self.page_directory['schema'] = [Page(), Page()]
+        # DANIEL COMMENT Also need a pointer for latest version in case of base page and ptr to prev version in case of tail page
         
 
     def __merge(self):
