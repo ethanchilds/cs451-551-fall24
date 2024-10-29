@@ -497,7 +497,8 @@ class BPlusTree:
                 if high_key is not None and leaf.keys[index] > high_key:
                     break
 
-                result.append((leaf.keys[index], leaf.values[index]))
+                # result.append((leaf.keys[index], leaf.values[index]))
+                result.append(leaf.values[index])
                 index += 1
             leaf = leaf.link
             index = 0

@@ -23,14 +23,15 @@ class Index:
     The index needs to be told when the table is changed.
     Take care of your index!!!
     """
-    def __init__(self, table, benchmark_mode=False):
+    def __init__(self, table, benchmark_mode=False, debug_mode=False):
         self.indices = [None] *  table.num_columns
         self.OrderedDataStructure = BPlusTree
         self.UnorderedDataStructure = HashMap
-        self.usage_histogram = [[0 for i in range(3)] for j in range(table.num_columns)] # 0: point queries, 1: range queries, 2: inserts, 3: updates
-        # self.maintenance_list = [[] for _ in range(table.num_columns)]
+        self.usage_histogram = [[0 for i in range(2)] for j in range(table.num_columns)] # 0: point queries, 1: range queries, 2: inserts, 3: updates
+        self.maintenance_list = [[] for _ in range(table.num_columns)]
         self.table = table
         self.benchmark_mode = benchmark_mode
+        self.debug_mode = debug_mode
 
         self.create_index(column_number=table.primary_key, ordered=False)
         
@@ -109,13 +110,14 @@ class Index:
     
     def maintain_insert(self, columns, rid):
         for column, value in enumerate(columns):
-            index = self.indices[column]
-            if index is not None:
-                index.insert(value, rid)
+            if self.indices[column] is not None:
+                self.maintenance_list[column].append((value, rid))
+                # self.indices[column].insert(value, rid)
 
     def maintain_update(self, primary_key, new_columns):
         rid = self.locate(column=self.table.primary_key, value=primary_key)[0]
         for column, new_value in enumerate(new_columns):
+            self._apply_maintenance(column)
             index = self.indices[column]
             if index and new_value:
                 old_value = self.table.page_directory.get_column_value(rid, column)
@@ -126,7 +128,8 @@ class Index:
         if rid is None:
             raise KeyError
         
-        for index in self.indices:
+        for column, index in enumerate(self.indices):
+            self._apply_maintenance(column)
             if index:
                 value = self.table.page_directory.get_column_value(rid, self.table.primary_key)
                 index.remove(value)
@@ -134,4 +137,15 @@ class Index:
         return
     
     def _apply_maintenance(self, column):
-        raise NotImplementedError
+        # raise NotImplementedError
+        if self.indices[column] is not None:
+            if len(self.maintenance_list[column]) > 0:
+                
+                if self.debug_mode:
+                    print(f"INDEX {column} IS APPLYING MAINTENANCE")
+
+                self.maintenance_list[column].sort(key=lambda item: item[0])
+                for value, rid in self.maintenance_list[column]:
+                    self.indices[column].insert(value, rid)
+
+                self.maintenance_list[column] = []
