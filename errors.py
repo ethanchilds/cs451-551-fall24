@@ -102,22 +102,9 @@ class RootParentError(BPlusTreeError):
         self.node = node
         super().__init__(f"Node is NOT maintained: Root node cannot have parent {self.node}")
 
-
-"""
-The keys of an internal node aren't arbitrary,
-they are a list of the first key in the child nodes...
-
-except for the first child node.
-example:
-internal node(keys=[5, 10])
-~
-leaf node(keys=[0, 1])
-leaf node(keys=[5, 6])
-leaf node(keys=[10, 11])
-"""
 class LikeFatherLikeSonError(BPlusTreeError):
     def __init__(self, parent_node, child_node):
-        super().__init__(f"Node is NOT maintained: {parent_node}'s keys should contain the first key of child {child_node}*** \n ***read error.py for a better description because there is some nuance here")
+        super().__init__(f"Node is NOT maintained: {parent_node} key is greater than child {child_node} first keys")
 
 class InvalidParentError(BPlusTreeError):
     def __init__(self, real_parent, false_parent, node):

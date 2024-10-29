@@ -71,7 +71,7 @@ class PageDirectory:
         assert rid < self.num_records
         
         # IMPORTANT TODO: this works for 64 bit integers, need to make some smart function for variable data types
-        page_capacity = Config.page_size // 8
+        page_capacity = Config.page_size // Config.page_cell_size
         current_rid = rid
         page_num = current_rid // page_capacity
         order_in_page = current_rid % page_capacity
@@ -119,7 +119,7 @@ class PageDirectory:
     def get_column_value(self, rid, column_id, tail_flg = 0):
         assert column_id < self.num_columns
 
-        page_capacity = Config.page_size // 8
+        page_capacity = Config.page_size // Config.page_cell_size
         page_num = rid // page_capacity
         order_in_page = rid % page_capacity
 
@@ -133,7 +133,7 @@ class PageDirectory:
     def set_column_value(self, rid, column_id, new_value, tail_flg = 0,):
         assert column_id < self.num_columns
 
-        page_capacity = Config.page_size // 8
+        page_capacity = Config.page_size // Config.page_cell_size
         page_num = rid // page_capacity
         order_in_page = rid % page_capacity
 

@@ -19,7 +19,7 @@ class Config:
     rid_column_idx = 1
     timestamp_column_idx = 2
     schema_encoding_column_idx = 3
-    benchmark_mode = True
+    benchmark_mode = False
 
     # Best time to insert 100_000 random items into a b+ tree with minimum_degree.
     # 200 1.5865

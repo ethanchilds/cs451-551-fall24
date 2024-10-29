@@ -3,12 +3,20 @@ class HashMap:
         self.map = {}
         self.length = 0
 
-    def get(self, key):
-        return self.map.get(key)
-
     def insert(self, key, value):
         self.length += 1
         self.map[key] = value
+
+    def get(self, key):
+        return [self.map.get(key)] if key in self.map else []
+    
+    def get_range(self, low_key, high_key):
+        values = []
+        for key, value in self.map.items():
+            if key >= low_key and key <= high_key:
+                values.append((value, key))
+
+        return values
         
     def minimum(self):
         minimum = None
@@ -30,10 +38,10 @@ class HashMap:
 
         return self.map[maximum] if maximum is not None else None
     
-    def contains_key(self, key):
+    def __contains__(self, key):
         return self.map.get(key) is not None
     
-    def len(self):
+    def __len__(self):
         return self.length
     
     def keys(self):
@@ -42,16 +50,14 @@ class HashMap:
     def values(self):
         return self.map.values()
     
-    def get_range(self, low_key, high_key):
-        values = []
-        for key, value in self.map.items():
-            if key >= low_key and key <= high_key:
-                values.append((value, key))
-
-        return values
-    
     def remove(self, key):
         if key in self.map:
             del self.map[key]
+            self.length -= 1
         else:
             raise KeyError
+        
+    def update(self, old_key, new_key):
+        value = self.get(old_key)
+        self.remove(old_key)
+        self.insert(new_key, value)

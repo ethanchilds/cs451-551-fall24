@@ -80,8 +80,9 @@ def test_data_structure_correctness(DataStructure, operations):
 def test_data_structure_insert_speed(DataStructure, operations):
     data_structure = DataStructure(unique_keys=False)
 
-    items = [(random(), "Value")] * operations
-    sorted(items, key= lambda x: x[0])
+    items = [(random(), "Value") for i in range(operations)]
+    items.sort(key= lambda x: x[0], reverse=False)
+    # sorted(items, key=lambda x: x[0])
 
     for item in items:
     # for i in range(operations):
@@ -218,6 +219,19 @@ unittest.main()
 # test_data_structure_insert_speed(HashMap, 500_000)
 
 
+tree = BPlusTree(minimum_degree=2, unique_keys=True, debug_mode=True)
+for i in range(28):
+    tree.insert(i, 1)
+
+for i in reversed(range(23, 28)): # Things are different when I remove 23
+    print(i)
+    tree.remove(i)
+
+print(tree)
+
+exit()
+
+
 from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
@@ -243,3 +257,4 @@ print(table.index.locate(2, 99))
 print(table.index.locate(2, 99))
 print(table.index.usage_histogram)
 print(table)
+

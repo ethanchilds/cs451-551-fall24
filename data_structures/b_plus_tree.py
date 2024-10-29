@@ -63,13 +63,12 @@ class Node:
 
         # TODO: The range of a nodes keys must be in between (inclusive I think) two keys of the parent
 
-        # not even a real property of a b+ tree :(, don't waste your time on this.
-        # if not self.is_leaf:
-        #     for index in range(len(self.keys)):
-        #         if self.values[index + 1].keys[0] != self.keys[index]:
-        #             print(f"{self.values[index + 1].keys[0]}, {self.keys[index]}")
-        #             # Can you tell i'm have fun with these error names yet?
-        #             raise LikeFatherLikeSonError(self, self.values[index + 1])
+        if not self.is_leaf:
+            for index in range(len(self.keys)):
+                if self.values[index + 1].keys[0] < self.keys[index]:
+                    print(f"{self.values[index + 1].keys[0]}, {self.keys[index]}")
+                    # Can you tell i'm have fun with these error names yet?
+                    raise LikeFatherLikeSonError(self, self.values[index + 1])
 
 
 
@@ -92,7 +91,7 @@ class Node:
             keys_to_show.append("...")  # formats with quotes, but it isn't worth my time to make it look pretty.
         
         if self.is_leaf and len(self.values) > max_items:
-            value_string.append("...")
+            value_string += "..."
 
         return f"{node_type} Node(keys={keys_to_show}{value_string})"
 
@@ -163,7 +162,7 @@ class TestNode(unittest.TestCase):
     def test_keys_within_limits(self):
         node = Node(minimum_degree=2, is_leaf=False)
         node.keys = [1, 2, 3]
-        node.values = [Node(parent=node)] * 4
+        node.values = [Node(parent=node) for _ in range(4)]
         node.parent = Node()
         for i in range(4):
             node.values[i].keys = [i]
@@ -460,7 +459,7 @@ class BPlusTree:
         index = self._find_key_index(node.keys, key)
 
         if index < len(node.keys) and key == node.keys[index]:
-            return node.values[index]
+            return [node.values[index]]
         
         return None
     
@@ -598,7 +597,7 @@ class BPlusTree:
             self._handle_underflow(leaf_node)
 
         if self.debug_mode:
-            self.is_maintained()
+            assert self.is_maintained()
 
     def _handle_underflow(self, node):
         """
@@ -632,19 +631,26 @@ class BPlusTree:
         """
         parent = node.parent
 
-        if parent is None:  # If node is the root
-            if len(node.keys) == 0: # If the root has no keys, the node is no longer the root.
-                if node.values: # The root was empty because the tree needs some height removed
+        node_is_root = parent is None
+        if node_is_root:
+            root_has_no_keys = len(node.keys) == 0
+            if root_has_no_keys:
+                root_has_a_value = len(node.values) != 1
+                if root_has_a_value: 
+                    print(f"LEN NODE VALUES : {len(node.values)}")
                     self.root = node.values[0]
-                    self.root.parent = None # Important for tree maintenance.
-                else: # The root was empty because the tree is empty
+                    self.root.parent = None
+                else:
                     self.root = Node(self.minimum_degree, is_leaf=True)
+                print("Height is being lowered...")
                 self.height -= 1
+            print("handling root")
             return
 
         # Find the index of the node in the parent's values
         # Raises error if node isn't in index. Won't happen in a properly maintained tree.
         index = parent.values.index(node)
+
         left_sibling = parent.values[index - 1] if index > 0 else None
         right_sibling = parent.values[index + 1] if index < len(parent.values) - 1 else None
         assert (left_sibling or right_sibling)
@@ -652,6 +658,8 @@ class BPlusTree:
         if left_sibling:
             left_sibling_has_spare_item = len(left_sibling.keys) > self.minimum_degree - 1
             if left_sibling_has_spare_item:
+                # left_sibling(k11, k12, k13) node(k21)
+                # left_sibling(k11, k21) node(k13, k21)
 
                 if self.debug_mode:
                     print(f"{node} is borrowing from its left sibling {left_sibling}")
@@ -676,6 +684,8 @@ class BPlusTree:
         if right_sibling:
             right_sibling_has_spare_item = len(right_sibling.keys) > self.minimum_degree - 1
             if right_sibling_has_spare_item:
+                # node(k11) right_sibling(k21, k22, k23)
+                # node(k11, k21) right_sibling(k22, k23)
 
                 if self.debug_mode:
                     print(f"{node} is borrowing from its right sibling {right_sibling}")
@@ -692,48 +702,43 @@ class BPlusTree:
                 if not node.is_leaf:
                     borrowed_value.parent = node
 
-                # Update parents keys
+                # Update parents keys. It's the key associated with the right sibling
                 parent.keys[index] = right_sibling.keys[0]
                 return
 
-        # If we can't borrow, 
+        # If we can't borrow, merge
         if left_sibling:
+            right_sibling = node
+            index -= 1
+        else:
+            left_sibling = node
 
-            if self.debug_mode:
-                print(f"{node} is merging with left sibling {left_sibling}")
 
-            left_sibling.keys.append(parent.keys[index - 1])
-            left_sibling.keys.extend(node.keys)
-            left_sibling.values.extend(node.values)
+        if self.debug_mode:
+            print(f"left {left_sibling} is merging with right {right_sibling}")
 
-            parent.keys.pop(index - 1)
-            parent.values.pop(index)
-
-        else:  # Merge with right sibling
-            
-            if self.debug_mode:
-                print(f"{node} is merging with right sibling {right_sibling}")
+        right_sibling_is_internal = not right_sibling.is_leaf
+        if right_sibling_is_internal:
+            # Give right sibling an even amount of keys and values
+            right_sibling.keys.insert(0, right_sibling.values[0].keys[0])
 
             # Update right sibling's item's parent
-            if not node.is_leaf:
-                for child in right_sibling.values:
-                    child.parent = node
+            for child in right_sibling.values:
+                child.parent = left_sibling
 
-                # promote first key of first child of right sibling
-                right_sibling.keys.insert(0, right_sibling.values[0].keys[0])
+        # Take all right sibling vlaues
+        left_sibling.keys.extend(right_sibling.keys)
+        left_sibling.values.extend(right_sibling.values)
 
-            # Take all right sibling vlaues
-            node.keys.extend(right_sibling.keys)
-            node.values.extend(right_sibling.values)
+        # Update link
+        left_sibling.link = right_sibling.link
 
-            # Update link
-            node.link = right_sibling.link
+        # Remove reference to right sibling
+        parent.keys.pop(index)
+        parent.values.pop(index + 1)
 
-            # Remove reference to right sibling
-            parent.keys.pop(index)
-            parent.values.pop(index + 1)
-
-        print(f"Merged node {node}")
+        if self.debug_mode:
+            print(f"Merged node {node}")
 
         parent_is_underflowed = len(parent.keys) < self.minimum_degree - 1
         if parent_is_underflowed:
@@ -802,27 +807,29 @@ class BPlusTree:
         return True
     
     def __str__(self):
-        # TODO: doesn't print the exact way I would like, but gets the point across.
-        # Rn it groups nodes that are siblings. It should also group nodes by tree depth.
-        # Todo so, we need to keep track of the right most node at each height.
         if not self.root:
             return "Empty B+ Tree"
         
-        result = []
-        queue = [self.root]
+        result = ["### Depth 0 ###", "~~~"]
+        queue = [(self.root, 0)]
+        current_depth = 0
 
         while queue:
-            current_node = queue.pop(0)
+            current_node, depth = queue.pop(0)
+
+            if depth > current_depth:
+                result.append(f"~~~")
+                result.append(f"### Depth {depth} ###")
+                current_depth = depth
+
             result.append(str(current_node))
 
+
             if type(current_node) is Node and not current_node.is_leaf:
-                queue.append(f"~~~~~~")
-                queue.extend(current_node.values)
+                queue.append((f"~~~", depth + 1))
+                queue.extend((child, depth + 1) for child in current_node.values)
 
-        return '\n'.join(result)
-
-
-    
+        return '\n'.join(result)   
 
 class TestBPlusTree(unittest.TestCase):
     def setUp(self):
@@ -1044,14 +1051,14 @@ class TestBPlusTree(unittest.TestCase):
         self.assertTrue(10 in tree)
 
     def test_many_trees(self):
-        for size in range(10):
+        for size in range(100):
             self._test_many_trees(size * 3)
 
     def _test_many_trees(self, size):
-        tree = self.tree
+        tree = BPlusTree(minimum_degree=2)
         for i in range(size):
             tree.insert(random(), i)
-            self.assertTrue(tree.is_maintained())
+        tree.is_maintained()
 
     def test_parent_pointer(self):
         tree = self.tree
@@ -1070,24 +1077,105 @@ class TestBPlusTree(unittest.TestCase):
             tree.insert(i, i*i)
 
         tree.remove(42)
+        
         self.assertTrue(tree.is_maintained())
         self.assertFalse(tree.get(42))
         self.assertTrue(len(tree) == 49)
 
-    def test_fill_and_empty_tree(self):
+    def test_fill_and_empty_from_left(self):
         tree = self.tree
-        tree.debug_mode = True
         tree.unique_keys = True
-        for i in range(10):
+        for i in range(100):
             tree.insert(i, i*i)
 
-        for i in range(5):
-            try:
+        for i in range(100):
+            tree.remove(i)
+
+        self.assertEqual(len(tree), 0)
+
+    def test_fill_and_empty_from_right(self):
+        tree = self.tree
+        tree.unique_keys = True
+        tree.debug_mode = True
+        try:
+            for i in range(28):
+                tree.insert(i, i*i)
+
+            print(tree)
+
+            for i in range(27, -1, -1):
+                if i == 14:
+                    print(tree)
                 tree.remove(i)
-                self.assertTrue(tree.is_maintained())
-            except Exception as e:
-                print(f"\n{e}")
-                print(i)
-                print(tree)
-                raise e
-            
+        except Exception as e:
+            print("TEST FILL AND EMPTY FROM RIGHT FAILED. PRINTING TREE STATE")
+            print(tree)
+            raise e
+
+        self.assertEqual(len(tree), 0)
+
+
+    def test_random_insert_and_remove(self):
+        tree = self.tree
+        tree.unique_keys = True
+        items = [[random(), random()] for _ in range(64)]
+
+        for i in range(32):
+            tree.insert(items[i][0], items[i][1])
+
+        for i in range(16):
+            tree.remove(items[i][0])
+
+        for i in range(32, 64):
+            tree.insert(items[i][0], items[i][1])
+
+        for i in range(32, 48):
+            tree.remove(items[i][0])
+
+        self.assertTrue(tree.is_maintained())
+
+    def test_erratic_insert_and_remove(self):
+        from random import shuffle
+        tree = self.tree
+        tree.unique_keys = True
+        tree.debug_mode = True
+
+        # Make a list of insert and remove operations in a random order, with insert before remove 
+        items = []
+        for i in range(100):
+            key = i
+            value = None
+            items.append([key, value])
+            items.append([key, value])
+
+        shuffle(items)
+
+        item_set = set()
+        for i, item in enumerate(items):
+            item[1] = i
+            if item[0] not in item_set:
+                item.append("Insert")
+                item_set.add(item[0])
+            else:
+                item.append("Remove")
+        try:
+            for item in items:
+                # print(item)
+                if item[2] == "Insert":
+                    tree.insert(item[0], item[1])
+                else:
+                    tree.remove(item[0])
+        except Exception as e:
+            print("TEST FAILED. PRINTING TREE STATE")
+            # print(tree)
+            raise e
+
+        self.assertTrue(tree.is_maintained())
+
+
+    def test_large_tree(self):
+        tree = BPlusTree(minimum_degree=Config.b_plus_tree_minimum_degree)
+        for i in range(50_000):
+            tree.insert(random(), i)
+
+        self.assertTrue(tree.is_maintained())

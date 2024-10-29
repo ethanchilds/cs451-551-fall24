@@ -27,11 +27,11 @@ class Index:
         self.OrderedDataStructure = BPlusTree
         self.UnorderedDataStructure = HashMap
         self.usage_histogram = [[0 for i in range(3)] for j in range(table.num_columns)] # 0: point queries, 1: range queries, 2: inserts, 3: updates
-        self.maintenance_list = [[] for _ in range(table.num_columns)]
+        # self.maintenance_list = [[] for _ in range(table.num_columns)]
         self.table = table
         self.benchmark_mode = benchmark_mode
 
-        self.create_index(column_number=table.primary_key, ordered=False)
+        self.create_index(column_number=table.primary_key, ordered=True)
         
 
     def locate(self, column: int, value):
@@ -96,7 +96,7 @@ class Index:
         """
         for rid, value in self.table.column_iterator(column):
             if value == target_value:
-                yield (rid, value)
+                yield (rid)
 
     def _locate_range_linear(self, column, low_target_value, high_target_value):
         """
@@ -105,17 +105,21 @@ class Index:
         """
         for rid, value in self.table.column_iterator(column):
             if (not low_target_value or value >= low_target_value) and (not high_target_value or value <= high_target_value):
-                yield (rid, value)
+                yield (value, rid)
     
     def maintain_insert(self, columns, rid):
         for column, value in enumerate(columns):
             index = self.indices[column]
-            if index:
+            if index is not None:
                 index.insert(value, rid)
 
-    def maintain_update(self, old_columns, new_columns, rid):
-        print("INDEX MAINTAIN UPDATE IS NOT IMPLIMENTED YET")
+    def maintain_update(self, primary_key, new_columns):
         return
+        rid = list(self.locate(column=self.table.primary_key, value=primary_key))
+        for column, new_value in enumerate(new_columns):
+            index = self.indices[column]
+            if index:
+                index.update(old_value, new_value, rid)
     
     def maintain_delete(self, columns, rid):
         print("INDEX MAINTAIN UPDATE IS NOT IMPLIMENTED YET")
