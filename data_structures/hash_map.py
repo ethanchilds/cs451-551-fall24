@@ -14,7 +14,7 @@ class HashMap:
         values = []
         for key, value in self.map.items():
             if key >= low_key and key <= high_key:
-                values.append((value, key))
+                values.append(value)
 
         return values
         
@@ -54,8 +54,9 @@ class HashMap:
         if key in self.map:
             del self.map[key]
             self.length -= 1
-        else:
-            raise KeyError
+        # else:
+        #     # raise KeyError
+        #     print("Key Error")
         
     def update(self, old_key, new_key):
         value = self.get(old_key)

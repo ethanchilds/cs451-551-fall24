@@ -10,6 +10,7 @@ from utilities.timer import timer
 from config import Config
 from data_structures.b_plus_tree import BPlusTree
 from data_structures.hash_map import HashMap
+from errors import *
 
 POINT_QUERY = 0
 RANGE_QUERY = 1
@@ -31,18 +32,17 @@ class Index:
         self.table = table
         self.benchmark_mode = benchmark_mode
 
-        self.create_index(column_number=table.primary_key, ordered=True)
+        self.create_index(column_number=table.primary_key, ordered=False)
         
 
     def locate(self, column: int, value):
         """
         returns the location of all records with the given value on column "column"
         """
-        self.usage_histogram[column][0] += 1
-
         if column >= len(self.indices) or column < 0:
-            print(f"INVALID COLUMN {column}")
+            raise ColumnDoesNotExist
 
+        self.usage_histogram[column][0] += 1
 
         if self.indices[column]:
             index = self.indices[column]
@@ -96,7 +96,7 @@ class Index:
         """
         for rid, value in self.table.column_iterator(column):
             if value == target_value:
-                yield (rid)
+                yield rid
 
     def _locate_range_linear(self, column, low_target_value, high_target_value):
         """
@@ -105,7 +105,7 @@ class Index:
         """
         for rid, value in self.table.column_iterator(column):
             if (not low_target_value or value >= low_target_value) and (not high_target_value or value <= high_target_value):
-                yield (value, rid)
+                yield rid
     
     def maintain_insert(self, columns, rid):
         for column, value in enumerate(columns):
@@ -114,15 +114,23 @@ class Index:
                 index.insert(value, rid)
 
     def maintain_update(self, primary_key, new_columns):
-        return
-        rid = list(self.locate(column=self.table.primary_key, value=primary_key))
+        rid = self.locate(column=self.table.primary_key, value=primary_key)[0]
         for column, new_value in enumerate(new_columns):
             index = self.indices[column]
-            if index:
-                index.update(old_value, new_value, rid)
+            if index and new_value:
+                old_value = self.table.page_directory.get_column_value(rid, column)
+                index.update(old_value, new_value)
     
-    def maintain_delete(self, columns, rid):
-        print("INDEX MAINTAIN UPDATE IS NOT IMPLIMENTED YET")
+    def maintain_delete(self, primary_key):
+        rid = self.locate(column=self.table.primary_key, value=primary_key)[0]
+        if rid is None:
+            raise KeyError
+        
+        for index in self.indices:
+            if index:
+                value = self.table.page_directory.get_column_value(rid, self.table.primary_key)
+                index.remove(value)
+
         return
     
     def _apply_maintenance(self, column):

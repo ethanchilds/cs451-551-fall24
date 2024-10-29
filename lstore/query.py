@@ -47,6 +47,7 @@ class Query:
             # TODO: Eventually check for LOCK state
 
             # Set the deletion flag on the specified record (Set RID to -1)
+            self.table.index.maintain_delete(primary_key)
             return self.table.delete(self.table[primary_key])
         else:
             return False
@@ -296,7 +297,7 @@ class Query:
         #     if start_range <= self.table.page_directory.get_column_value(rid, self.table.primary_key + Config.column_data_offset) <= end_range:
         #         relevant_rids.append(rid)  
 
-        relevant_rids = [rid for value, rid in self.table.index.locate_range(begin=start_range, end=end_range, column=self.table.primary_key)]   
+        relevant_rids = self.table.index.locate_range(begin=start_range, end=end_range, column=self.table.primary_key)  
 
         if len(relevant_rids) == 0:
             return False

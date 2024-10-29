@@ -233,7 +233,7 @@ class Table:
         #    raise IndexError("Key {} does not exist.".format(key))
 
         # Use the internal Index to find a record
-        return self.index.locate(self.primary_key, primary_key)
+        return self.index.locate(self.primary_key, primary_key)[0]
 
     def __len__(self):
         """Get the total number of Records
