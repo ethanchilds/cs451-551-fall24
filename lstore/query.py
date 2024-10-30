@@ -191,11 +191,10 @@ class Query:
         columns_values = [-1] * (len(columns) + Config.column_data_offset)
 
         # need base meta information
-        base_meta = []
         rid = relevant_rids[0]
  
-        for i in range(Config.column_data_offset):
-            base_meta.append(self.table.page_directory.get_column_value(rid, i, tail_flg=0))
+        base_ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx, tail_flg=0)
+        base_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, tail_flg=0)
 
         # create new tail record based off of base record data
         new_rid = self.table.page_directory.num_tail_records
@@ -203,34 +202,30 @@ class Query:
         columns_values[Config.rid_column_idx] = new_rid
         # get current timestamp as an integer
         columns_values[Config.timestamp_column_idx] = int(datetime.datetime.now().timestamp())
-        columns_values[Config.indirection_column_idx] = base_meta[Config.indirection_column_idx]
+        columns_values[Config.indirection_column_idx] = base_ind
 
         # code below maintains cumulative approach to tail records
 
+
         # if there is another update
-        if base_meta[Config.indirection_column_idx] != -1:
+        if base_ind != -1:
             # get current values of record
             old_record = self.select(primary_key, self.table.primary_key, [1]*len(columns))[0]
-            tail_flg, tail_rid = self.table.page_directory.get_rid_for_version(old_record.rid)
-
-            assert tail_flg == 1
-
-            # update indirection
-            columns_values[Config.indirection_column_idx] = tail_rid
 
             for i in range(len(columns)):
-                if utils.get_bit(base_meta[Config.schema_encoding_column_idx], i):
+                if utils.get_bit(base_schema, i):
                     columns_values[i + Config.column_data_offset] = old_record.columns[i]
 
         # for all columns passed in check if they are Nonetype,
         # if not add it tail record and adjust schema accordingly
         # else, add -1 as place holder
+        new_schema = base_schema
         for i in range(len(columns)):
             if columns[i] is not None:
                 columns_values[i + Config.column_data_offset] = columns[i]
-                base_meta[Config.schema_encoding_column_idx] = utils.set_bit(base_meta[Config.schema_encoding_column_idx], i)
+                new_schema = utils.set_bit(new_schema, i)
         
-        columns_values[Config.schema_encoding_column_idx] = base_meta[Config.schema_encoding_column_idx]
+        columns_values[Config.schema_encoding_column_idx] = new_schema
 
         # add record to tail page
         self.table.page_directory.add_record(columns_values, tail_flg=1)
