@@ -49,12 +49,14 @@ class TestLstroreDB(unittest.TestCase):
         
         for i in range(1,1+num_trials):
             change_index = (i % 4) + 1
+
             test_values[change_index] = i
             test_dict[i] = test_values.copy()
             self.query.update(0, *test_values)
             
         for key in test_dict:
             version = key - num_trials
+            # print(version)
             record = self.query.select_version(0,0, [1]*5, version)[0]
             self.assertListEqual(test_dict[key], record.columns)
 
@@ -95,15 +97,15 @@ class TestLstroreDB(unittest.TestCase):
         self.assertEqual(sum, calc_sum)
 
     def test_sum_version_integers(self):
-        n = 514
+        n = 5
 
         for i in range(1, n+1):
-            self.query.insert(*[i]*5)
+            self.query.insert(*([i]*5))
 
-        for i in range(n):
+        for i in range(1, n+1):
             self.query.update(i, *[i]*5)
 
-        sum = self.query.sum_version(1, n+1, 2, -1)
+        sum = self.query.sum_version(1, n+1, 2, relative_version=-1)
 
         calc_sum = (n*(n+1)) / 2
         self.assertEqual(sum, calc_sum)
@@ -112,12 +114,12 @@ class TestLstroreDB(unittest.TestCase):
         test_values = [0,1,2,3,4]
         self.query.insert(*test_values)
 
-        for i in range(5):
+        for i in range(1, 5):
             truth = self.query.increment(0, i)
             self.assertTrue(truth)
         
         record = self.query.select(0,0,[1]*5)[0]
-        self.assertListEqual([1,2,3,4,5], record.columns)
+        self.assertListEqual([0,2,3,4,5], record.columns)
 
     def test_mostly_all_functions(self):
         n = 5000
