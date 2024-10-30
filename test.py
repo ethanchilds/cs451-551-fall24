@@ -41,13 +41,15 @@ class TestLstroreDB(unittest.TestCase):
 
     def test_select_version_any_number_updates(self):
         # test if select version is running properly
+        # update record with primary key 0 however many times and test if every version is correct
         test_values = [0,1,2,3,4]
         self.query.insert(*test_values)
         test_dict = {}
         num_trials = 514
         
         for i in range(1,1+num_trials):
-            change_index = 1 + i % 4
+            change_index = (i % 4) + 1
+
             test_values[change_index] = i
             test_dict[i] = test_values.copy()
             self.query.update(0, *test_values)
