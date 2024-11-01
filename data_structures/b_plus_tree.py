@@ -198,6 +198,7 @@ class BPlusTree:
             self, 
             minimum_degree: int=Config.b_plus_tree_minimum_degree, 
             unique_keys: bool=True,
+            return_keys: bool=False,
             debug_mode: bool=False, 
             search_algorithm_threshold=Config.b_plus_tree_search_algorithm_threshold
         ):
@@ -205,6 +206,7 @@ class BPlusTree:
         self.length = 0
         self.minimum_degree = minimum_degree
         self.unique_keys = unique_keys
+        self.return_keys = return_keys  # return [(key, value)] OR return [(value)]
         self.root = Node(minimum_degree, is_leaf=True)
 
         self.search_algorithm_threshold = search_algorithm_threshold # When do we binary search keys and when do we linear scan keys?
@@ -322,6 +324,8 @@ class BPlusTree:
         # print(self.is_maintained())
 
     def _build_tree(self, leaf_nodes):
+        raise NotImplementedError
+        # Goes along with self.bulk_insert
         if not leaf_nodes:
             return None
         
@@ -459,7 +463,7 @@ class BPlusTree:
         index = self._find_key_index(node.keys, key)
 
         if index < len(node.keys) and key == node.keys[index]:
-            return [node.values[index]]
+            return [(node.keys[index], node.values[index])] if self.return_keys else [node.values[index]]
         
         return None
     
@@ -498,7 +502,7 @@ class BPlusTree:
                     break
 
                 # result.append((leaf.keys[index], leaf.values[index]))
-                result.append(leaf.values[index])
+                result.append((leaf.keys[index], leaf.values[index]) if self.return_keys else leaf.values[index])
                 index += 1
             leaf = leaf.link
             index = 0
@@ -834,7 +838,7 @@ class BPlusTree:
 
 class TestBPlusTree(unittest.TestCase):
     def setUp(self):
-        self.tree = BPlusTree(minimum_degree=2, unique_keys=False)
+        self.tree = BPlusTree(minimum_degree=2, unique_keys=False, return_keys=True)
 
     # I used https://www.cs.usfca.edu/~galles/visualization/BPlusTree.html to help me design this. -Kai
     # Its what a tree should look like after inserting 1 through 10 in order.
