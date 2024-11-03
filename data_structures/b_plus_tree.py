@@ -63,6 +63,9 @@ class Node:
 
         # TODO: The range of a nodes keys must be in between (inclusive I think) two keys of the parent
 
+        # I now know the true rule to follow. The old rule is a special case of the true rule (which made for some horrific bugs)
+        # Each internal key is the smallest key in the associated keys subbranch
+        # I thought it was each internal key equals the smallest key in associated keys child node
         if not self.is_leaf:
             for index in range(len(self.keys)):
                 if self.values[index + 1].keys[0] < self.keys[index]:
@@ -575,157 +578,104 @@ class BPlusTree:
             node = node.values[-1]
 
         return node
-
-    def remove(self, key):
-        if not self.unique_keys:
-            # remove(key, value). Key is not unique, but value is in our use case.
-            # key helps us find where value is and value helps us confirm we are at the right spot.
-            raise NotImplementedError
-
-        # Find the leaf node that contains the key
+    
+    def remove(self, key):     
         leaf_node = self._get_leaf(key)
         if leaf_node is None:
             raise KeyError(key)
-
-        #  Find the index of the key in the leaf node
+        
         index = self._find_key_index(leaf_node.keys, key)
         if index >= len(leaf_node.keys) or leaf_node.keys[index] != key:
             raise KeyError(key)
-
-        # Remove the key and corresponding value
+    
         leaf_node.keys.pop(index)
         leaf_node.values.pop(index)
         self.length -= 1
 
-        # Handle underflow
-        if len(leaf_node.keys) < self.minimum_degree - 1:
-            self._handle_underflow(leaf_node)
+        node = leaf_node
+
+        while (len(node.keys) < self.minimum_degree - 1) and (node.parent is not None):
+            node_index_in_parent = node.parent.values.index(node)
+
+            left_sibling = node.parent.values[node_index_in_parent - 1] if node_index_in_parent > 0 else None
+            right_sibling = node.parent.values[node_index_in_parent + 1] if node_index_in_parent < len(node.parent.values) - 1 else None
+
+            spare_item_in_left_sibling = left_sibling and len(left_sibling.keys) > self.minimum_degree - 1
+            spare_item_in_right_sibling = right_sibling and len(right_sibling.keys) > self.minimum_degree - 1
+            
+            if spare_item_in_left_sibling:
+                self._borrow_left(node, left_sibling, node_index_in_parent)
+            elif spare_item_in_right_sibling:
+                self._borrow_right(node, right_sibling, node_index_in_parent)
+            elif left_sibling:
+                self._merge_siblings(left_sibling, node, node_index_in_parent)
+            elif right_sibling:
+                self._merge_siblings(node, right_sibling, node_index_in_parent + 1)
+            else:
+                raise Exception
+            
+            node = node.parent
+
+        node_is_root = node.parent is None
+        if node_is_root and not node.is_leaf and len(node.values) == 1:
+            self.root = node.values[0]
+            self.root.parent = None
 
         if self.debug_mode:
-            assert self.is_maintained()
+            self.is_maintained()
 
-    def _handle_underflow(self, node):
-        """
-        pseudo code:
-        1  IF the node we removed from is the root DO 
-        2      return
-        3  END IF
-        4  find the path from the node parent to the node
-        5  IF there is a left libling with an item to spare DO
-        6      borrow from the left sibling, return
-        7  END IF
-        8  IF there is a right sibling with an item to spare DO
-        9      borrow from the right sibling, return
-        10 END IF
-        11 IF there is a left sibling DO
-        12     merge with the left sibling
-        13     IF parent underflows DO
-        14         resursively call this function on the parent
-        15     END IF
-        16 ELSE DO     # Garanteed to be a right sibling
-        17     merge with the right sibling
-        18     IF parent underflows DO
-        19         resursively call this function on the parent
-        20 END IF-ELSE
+    def _borrow_left(self, node, left_sibling, node_index_in_parent):
+        borrowed_key = left_sibling.keys.pop()
+        borrowed_value = left_sibling.values.pop()
+        
+        if node.is_leaf:
+            node.keys.insert(0, borrowed_key)
+            node.values.insert(0, borrowed_value)
 
-        TLDR
-        Attempt to borrow a sibling
-        Otherwise merge with a sibling and recursion
+            node.parent.keys[node_index_in_parent - 1] = borrowed_key
 
-        Prioritize the left sibling
-        """
-        parent = node.parent
-
-        node_is_root = parent is None
-        if node_is_root:
-            root_has_no_keys = len(node.keys) == 0
-            if root_has_no_keys:
-                root_has_a_value = len(node.values) != 1
-                if root_has_a_value: 
-                    print(f"LEN NODE VALUES : {len(node.values)}")
-                    self.root = node.values[0]
-                    self.root.parent = None
-                else:
-                    self.root = Node(self.minimum_degree, is_leaf=True)
-                print("Height is being lowered...")
-                self.height -= 1
-            print("handling root")
-            return
-
-        # Find the index of the node in the parent's values
-        # Raises error if node isn't in index. Won't happen in a properly maintained tree.
-        index = parent.values.index(node)
-
-        left_sibling = parent.values[index - 1] if index > 0 else None
-        right_sibling = parent.values[index + 1] if index < len(parent.values) - 1 else None
-        assert (left_sibling or right_sibling)
-
-        if left_sibling:
-            left_sibling_has_spare_item = len(left_sibling.keys) > self.minimum_degree - 1
-            if left_sibling_has_spare_item:
-                # left_sibling(k11, k12, k13) node(k21)
-                # left_sibling(k11, k21) node(k13, k21)
-
-                if self.debug_mode:
-                    print(f"{node} is borrowing from its left sibling {left_sibling}")
-    
-                # Borrow last item in left sibling
-                borrowed_key = left_sibling.keys.pop()
-                borrowed_value = left_sibling.values.pop()
-
-                # Borrowed item becomes first in node
-                node.keys.insert(0, borrowed_key)
-                node.values.insert(0, borrowed_value)
-
-                # Update borrowed items parent
-                if not node.is_leaf:
-                    borrowed_value.parent = node
-                
-                # Update parents keys. [index - 1] cuz that's how keys and values are related to eachother
-                parent.keys[index - 1] = borrowed_key
-
-                return
-
-        if right_sibling:
-            right_sibling_has_spare_item = len(right_sibling.keys) > self.minimum_degree - 1
-            if right_sibling_has_spare_item:
-                # node(k11) right_sibling(k21, k22, k23)
-                # node(k11, k21) right_sibling(k22, k23)
-
-                if self.debug_mode:
-                    print(f"{node} is borrowing from its right sibling {right_sibling}")
-
-                # Borrow first item in right sibling
-                borrowed_key = right_sibling.keys.pop(0)
-                borrowed_value = right_sibling.values.pop(0)
-
-                # Borrowed item becomes last in node
-                node.keys.append(borrowed_key)
-                node.values.append(borrowed_value)
-
-                # Update borrowed items parent
-                if not node.is_leaf:
-                    borrowed_value.parent = node
-
-                # Update parents keys. It's the key associated with the right sibling
-                parent.keys[index] = right_sibling.keys[0]
-                return
-
-        # If we can't borrow, merge
-        if left_sibling:
-            right_sibling = node
-            index -= 1
         else:
-            left_sibling = node
+            parent_key = node.parent.keys.pop(node_index_in_parent - 1)
+            borrowed_value.parent = node
 
+            node.parent.keys.insert(node_index_in_parent - 1, borrowed_key)
+            node.keys.insert(0, parent_key)
+            node.values.insert(0, borrowed_value)
 
         if self.debug_mode:
-            print(f"left {left_sibling} is merging with right {right_sibling}")
+            print(f"Borrowed from right sibling to make {node}")
+
+    def _borrow_right(self, node, right_sibling, node_index_in_parent):
+        borrowed_key = right_sibling.keys.pop(0)
+        borrowed_value = right_sibling.values.pop(0)
+        
+        if node.is_leaf:
+            node.keys.append(borrowed_key)
+            node.values.append(borrowed_value)
+
+            node.parent.keys[node_index_in_parent] = right_sibling.keys[0]
+
+        else:
+            parent_key = node.parent.keys.pop(node_index_in_parent)
+            borrowed_value.parent = node
+
+            node.parent.keys.insert(node_index_in_parent, borrowed_key)
+            node.keys.append(parent_key)
+            node.values.append(borrowed_value)
+
+        if self.debug_mode:
+            print(f"Borrowed from right sibling to make {node}")
+    
+    def _merge_siblings(self, left_sibling, right_sibling, right_sibling_index_in_parent):
+        parent = left_sibling.parent
 
         right_sibling_is_internal = not right_sibling.is_leaf
         if right_sibling_is_internal:
             # Give right sibling an even amount of keys and values
-            right_sibling.keys.insert(0, right_sibling.values[0].keys[0])
+            # right_sibling.keys.insert(0, right_sibling.values[0].keys[0])
+            # right_sibling.keys.insert(0, parent.keys[0])
+            demoted_key = parent.keys[right_sibling_index_in_parent - 1]
+            right_sibling.keys.insert(0, demoted_key)
 
             # Update right sibling's item's parent
             for child in right_sibling.values:
@@ -739,17 +689,11 @@ class BPlusTree:
         left_sibling.link = right_sibling.link
 
         # Remove reference to right sibling
-        parent.keys.pop(index)
-        parent.values.pop(index + 1)
+        parent.keys.pop(right_sibling_index_in_parent - 1)
+        parent.values.pop(right_sibling_index_in_parent)
 
         if self.debug_mode:
-            print(f"Merged node {node}")
-
-        parent_is_underflowed = len(parent.keys) < self.minimum_degree - 1
-        if parent_is_underflowed:
-            self._handle_underflow(parent)
-
-        
+            print(f"Merged siblings into {left_sibling}")
 
 
     def __len__(self):
@@ -1141,13 +1085,15 @@ class TestBPlusTree(unittest.TestCase):
 
     def test_erratic_insert_and_remove(self):
         from random import shuffle
+        from random import seed
+        seed(99)
+        
         tree = self.tree
         tree.unique_keys = True
-        tree.debug_mode = True
 
         # Make a list of insert and remove operations in a random order, with insert before remove 
         items = []
-        for i in range(100):
+        for i in range(5_000):
             key = i
             value = None
             items.append([key, value])
@@ -1172,10 +1118,11 @@ class TestBPlusTree(unittest.TestCase):
                     tree.remove(item[0])
         except Exception as e:
             print("TEST FAILED. PRINTING TREE STATE")
-            # print(tree)
+            print(tree)
             raise e
 
         self.assertTrue(tree.is_maintained())
+        self.assertEqual(len(tree), 0)
 
 
     def test_large_tree(self):

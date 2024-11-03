@@ -208,7 +208,7 @@ import unittest
 from data_structures.b_plus_tree import TestNode as TestBPlusNode
 from data_structures.b_plus_tree import BPlusTree, TestBPlusTree
 
-# unittest.main()
+unittest.main()
 
 # map = test_data_structure_get_speed(HashMap, 1_000_000)
 
@@ -217,31 +217,25 @@ from data_structures.b_plus_tree import BPlusTree, TestBPlusTree
 # test_data_structure_insert_speed(BPlusTree, 500_000) # executed in 4.7528 seconds. 4.2134 with better parent method
 # test_data_structure_insert_speed(HashMap, 500_000)
 
-tree = BPlusTree(minimum_degree=2)
-items = [('F', 0), ('S', 1), ('Q', 2), ('K', 3), ('C', 4), ('L', 5), ('H', 6), ('T', 7), ('V', 8), ('W', 9), ('M', 10), ('R', 11), ('N', 12), ('P', 13), ('A', 14), ('B', 15), ('X', 16), ('Y', 17), ('D', 18), ('Z', 19), ('E', 20)]
-
-for item in items:
-    tree.insert(item[0], item[1])
-
-print(tree)
-print(tree.get('F'))
-
-exit()
-
 
 from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
 
-tree = BPlusTree(minimum_degree=2)
 
-for i in range(28):
-    tree.insert(i, f"the value is {i}")
+for tree_size in range(1000):
+    tree = BPlusTree(minimum_degree=2)
 
-for i in reversed(range(24, 28)):
-    tree.remove(i)
+    for key in range(tree_size):
+        tree.insert(key, f"the value is {key}")
 
-print(tree)
+    try:
+        for key in reversed(range(0, tree_size)):
+            tree.remove(key)
+        # print(f"{tree_size} was successfull")
+    except:
+        print(f"{tree_size} was not successfull")
+
 
 exit()
 
