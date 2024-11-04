@@ -222,9 +222,6 @@ from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
 
-minimum_degree = 128
-size = 50_000_000
-
 # COMPARING INSERT VS BULK INSERT (min degree 128)
 # size          insert time     bulk insert time    difference
 # 100_000       0.2744          0.0259              10.594
@@ -240,16 +237,29 @@ def fn1(minimum_degree, size):
     for i in range(size):
         tree.insert(i, i + i)
 
+    return tree
+
 @timer
 def fn2(minimum_degree, size, items):
     # Pass the items as an argument becuase making and storing them takes just as long as bulk insert
     tree = BPlusTree(minimum_degree)
     tree.bulk_insert(items)
 
-fn1(minimum_degree, size)
+    return tree
+
+minimum_degree = 128
+size = 1_000_000
+
+tree_insert = fn1(minimum_degree, size)
 items = [(i, i+i) for i in range(size)]
 print("starting fn2")
-fn2(minimum_degree, size, items)
+tree_batch_insert = fn2(minimum_degree, size, items)
+
+# tree_batch_insert._maximum_leaf().values[0] = "AWOOOOOGAAA"
+# tree_batch_insert.root.values[1].values[-1].keys[-1] += 1
+tree_batch_insert.is_maintained()
+
+print(tree_insert == tree_batch_insert)
 
 # b = []
 # limit = size - (minimum_degree * 2)
