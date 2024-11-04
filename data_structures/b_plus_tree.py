@@ -775,12 +775,16 @@ class BPlusTree:
             return False
 
         # If both nodes are internal, compare their children
+        if node1.is_leaf and node1.values != node2.values:
+            return False
+
         if not node1.is_leaf:
             if len(node1.values) != len(node2.values):
                 return False
             for child1, child2 in zip(node1.values, node2.values):
                 if not self._compare_nodes(child1, child2):
                     return False
+        
 
         return True
     
