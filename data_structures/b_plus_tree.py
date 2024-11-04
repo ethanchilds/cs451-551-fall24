@@ -293,66 +293,95 @@ class BPlusTree:
         if self.debug_mode:
             self.is_maintained()
 
-
-    """
-    Bulk Insert Method
-    If you already many items, use this instead of insert. It's way faster.
-    items: a list of key-value tuples
-    """
     def bulk_insert(self, items):
-        # Doesn't work for most sized inputs... yet.
-        # 5 fold efficiency gains for whoever finishes this.
-        raise NotImplementedError  
-
-        # TODO: make this its own actual error
+        """
+        Bulk Insert Method
+        If you already many items, use this instead of insert. It's way faster.
+        items: a list of key-value tuples
+        """
         if len(self.root.keys):
-            print("build insert needs to be on an empty tree")
-            raise KeyError("uhh tree too big")
+            raise KeyError("bulk insert can only be called on an empty b+ tree")
+        
+        self.length = len(items)
 
         # Sort items by key
-        items_sorted = sorted(items, key=lambda item: item[0])
-        leaf_nodes = []
-        current_leaf = []
+        items.sort(key=lambda item: item[0])
+        items_by_leaf_node = []
+        leaf_nodes = [] # containes elements (node, min_key_in_subtree)
 
-        for item in items_sorted:
-            current_leaf.append(item)
-            if len(current_leaf) == self.minimum_degree * 2 - 1:
-                leaf_nodes.append(current_leaf)
-                current_leaf = []
+        limit = len(items) - (self.minimum_degree * 2)
+        items_by_leaf_node = []
 
-        if current_leaf:
-            leaf_nodes.append(current_leaf)
+        group_size = self.minimum_degree
+        stopping_point = 0
+        for i in range(0, limit + 1, group_size):
+            items_by_leaf_node.append(items[i:i + group_size])
+            stopping_point = i + group_size
 
-        self._build_tree(leaf_nodes)
-        # print(self.is_maintained())
+        items_are_remaining = limit < len(items)
+        if items_are_remaining:
+            items_by_leaf_node.append(items[stopping_point:])
 
-    def _build_tree(self, leaf_nodes):
-        raise NotImplementedError
-        # Goes along with self.bulk_insert
-        if not leaf_nodes:
-            return None
-        
-        leaf_parent = Node(self.minimum_degree, is_leaf=False)
-        for i, items in enumerate(leaf_nodes):
-            new_leaf = Node(self.minimum_degree, is_leaf=True)
-            new_leaf.parent = leaf_parent
-            new_leaf.keys = [item[0] for item in items]
-            new_leaf.values = [item[1] for item in items]
-            leaf_parent.values.append(new_leaf)
+        for i, node_items in enumerate(items_by_leaf_node):
+            node = Node(self.minimum_degree, is_leaf=True)
+            node.keys = [key for key, value in node_items]
+            node.values = [value for key, value in node_items]
+
             if i != 0:
-                leaf_parent.keys.append(new_leaf.keys[0])
+                leaf_nodes[-1].link = node
+
+            leaf_nodes.append(node)
+            
+        min_keys_of_leaf_nodes = [node.keys[0] for node in leaf_nodes]
+        self._build_layer(leaf_nodes, min_keys_of_leaf_nodes)
+        
+        if self.debug_mode:
+            self.is_maintained()
 
 
+    def _build_layer(self, nodes_at_level, min_keys_of_node_subtrees):
+        """
+        Recursively takes a layer of nodes and constructs the smaller layer above it.
+        nodes_at_level contains a list of elements (Node, min_key_in_subtree)
+        """
+        if len(nodes_at_level) == 1:
+            self.root = nodes_at_level[0]
+            return
+        
+        assert len(nodes_at_level) == len(min_keys_of_node_subtrees)
+        
+        limit = len(nodes_at_level) - (self.minimum_degree * 2 + 1)
+        nodes_by_parent = []
+        parents_keys = []
 
-        for i in range(len(leaf_parent.values) - 1):
-            leaf_parent.values[i].link  = leaf_parent.values[i + 1]
+        group_size = self.minimum_degree + 1
+        stopping_point = 0
+        for i in range(0, limit + 1, group_size):
+            nodes_by_parent.append(nodes_at_level[i:i + group_size])
+            parents_keys.append(min_keys_of_node_subtrees[i:i + group_size])
+            stopping_point = i + group_size
 
-        self.root = leaf_parent
+        items_are_remaining = limit < len(nodes_at_level)
+        if items_are_remaining:
+            nodes_by_parent.append(nodes_at_level[stopping_point:])
+            parents_keys.append(min_keys_of_node_subtrees[stopping_point:])
 
-        if len(leaf_parent.keys) >= self.minimum_degree:
-            self._split_internal_node(leaf_parent)
+        parent_nodes = []
+        for i, children in enumerate(nodes_by_parent):
+            parent = Node(self.minimum_degree)
+            parent.keys = parents_keys[i][1:]
+            parent.values = children
 
+            for child in children:
+                child.parent = parent
 
+            parent_nodes.append(parent)
+
+        min_keys_of_parent_subtrees = []
+        for parent_keys in parents_keys:
+            min_keys_of_parent_subtrees.append(parent_keys[0])
+
+        self._build_layer(parent_nodes, min_keys_of_parent_subtrees)
         
 
     # Not using for now becuase self[key] = value always inserts a value, never updates a value.

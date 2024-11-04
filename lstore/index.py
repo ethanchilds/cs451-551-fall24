@@ -33,7 +33,7 @@ class Index:
         self.benchmark_mode = benchmark_mode
         self.debug_mode = debug_mode
 
-        self.create_index(column_number=table.primary_key, ordered=False)
+        self.create_index(column_number=table.primary_key, ordered=True)
         
 
     def locate(self, column: int, value):

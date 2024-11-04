@@ -208,7 +208,7 @@ import unittest
 from data_structures.b_plus_tree import TestNode as TestBPlusNode
 from data_structures.b_plus_tree import BPlusTree, TestBPlusTree
 
-unittest.main()
+# unittest.main()
 
 # map = test_data_structure_get_speed(HashMap, 1_000_000)
 
@@ -222,20 +222,48 @@ from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
 
+minimum_degree = 128
+size = 50_000_000
 
-for tree_size in range(1000):
-    tree = BPlusTree(minimum_degree=2)
+# COMPARING INSERT VS BULK INSERT (min degree 128)
+# size          insert time     bulk insert time    difference
+# 100_000       0.2744          0.0259              10.594
+# 500_000       1.5082          0.1573              9.588
+# 1_000_000     3.0603          0.2500              12.241
+# 5_000_000     16.7839         1.3660              12.286
+# 10_000_000    35.8649         3.3714              10.637
+# 50_000_000    203.3555        it never finishes for some reason
 
-    for key in range(tree_size):
-        tree.insert(key, f"the value is {key}")
+@timer
+def fn1(minimum_degree, size):
+    tree = BPlusTree(minimum_degree)
+    for i in range(size):
+        tree.insert(i, i + i)
 
-    try:
-        for key in reversed(range(0, tree_size)):
-            tree.remove(key)
-        # print(f"{tree_size} was successfull")
-    except:
-        print(f"{tree_size} was not successfull")
+@timer
+def fn2(minimum_degree, size, items):
+    # Pass the items as an argument becuase making and storing them takes just as long as bulk insert
+    tree = BPlusTree(minimum_degree)
+    tree.bulk_insert(items)
 
+fn1(minimum_degree, size)
+items = [(i, i+i) for i in range(size)]
+print("starting fn2")
+fn2(minimum_degree, size, items)
+
+# b = []
+# limit = size - (minimum_degree * 2)
+# i = 0
+
+# while i <= limit:
+#     # print(minimum_degree)
+#     b.append(minimum_degree)
+#     i += minimum_degree
+# b.append(size - i)
+# print(b)
+
+
+    
 
 exit()
 

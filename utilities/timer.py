@@ -26,7 +26,7 @@ def timer(func, activate=Config.benchmark_mode):
             end_time = time.time()
             
             duration = end_time - start_time
-            # print(f"{func.__name__}({all_args}) executed in {duration:.4f} seconds")
+            print(f"{func.__name__}({all_args}) executed in {duration:.4f} seconds")
             return result
         
         return wrapper
