@@ -253,14 +253,6 @@ class Query:
 
         self.table.page_directory.set_column_value(
             rid,
-            Config.timestamp_column_idx,
-            new_value=columns_values[Config.timestamp_column_idx],
-            tail_flg=0
-        )
-        # assert self.table.page_directory.get_column_value(rid, Config.timestamp_column_idx, tail_flg=0) == columns_values[Config.timestamp_column_idx]
-
-        self.table.page_directory.set_column_value(
-            rid,
             Config.schema_encoding_column_idx,
             new_value=columns_values[Config.schema_encoding_column_idx],
             tail_flg=0
