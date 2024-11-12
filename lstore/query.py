@@ -73,6 +73,17 @@ class Query:
 
         # for each column: if the last base page is at full capacity -> add a new base page
 
+        # Verify that the primary key doesn't exist already
+        try:
+            pk = columns[self.table.primary_key]
+            pkv = self.table[pk]
+
+            # If the value is not null, it exists already
+            if (pkv != None):
+                return False
+        except:
+            pass
+
         columns_values = [None] * (len(columns) + Config.column_data_offset)
 
         new_rid = self.table.page_directory.num_records
@@ -187,7 +198,14 @@ class Query:
         #         found_rids.append(rid)
 
         found_rids = self.table.index.locate(column=self.table.primary_key, value=primary_key)
+        other_rids = self.table.index.locate(column=self.table.primary_key, value=columns[self.table.primary_key])
         
+        # Verify that changing the primary key does not result in an existing primary key
+        if (isinstance(other_rids, list)):
+            if (len(other_rids) > 0):
+                if (other_rids[0] not in found_rids):
+                    return False
+
         relevant_rids = []
 
         for rid in found_rids:
