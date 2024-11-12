@@ -79,7 +79,7 @@ class Query:
             pkv = self.table[pk]
 
             # If the value is not null, it exists already
-            if (pkv != None):
+            if (pkv is not None):
                 return False
         except:
             pass
