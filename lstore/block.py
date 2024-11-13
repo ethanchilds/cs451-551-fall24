@@ -8,10 +8,13 @@ Data is stored on disk with the following format:
 
 n_pages (4 Bytes)
 [
+    num_cells (4 Bytes)
     data (M Bytes)
 ] x n_pages
 
 Where:
+  * num_cells is defined as the total number of filled cells
+    in the Page
   * M is defined as the total number of bytes per page
 """
 
@@ -22,6 +25,7 @@ import struct
 
 # Local imports
 from config import Config
+from lstore.page import Page
 
 class Block():
     """A Block is a group of pages
@@ -53,7 +57,7 @@ class Block():
         self.column = column
         self.block_id = block_id
         self.size = size
-        self.pages = []
+        self.pages = []  # A list of Page objects
 
         # Compute the full path
         self.full_path = os.path.join(base_path, f"{0}.{1}.data".format(column, block_id))
@@ -80,12 +84,18 @@ class Block():
 
                 # Read each page into the internal array
                 for _ in range(n_pages):
+                    # Read Page metadata
+                    num_cells = struct.unpack('<i', fp.read(4))[0]
+
+                    # Read Page data
                     barray = fp.read(Config.page_size)
                     
                     # TODO pass bytes into decompression stream
 
                     # Add data to the page list
-                    self.pages.append(barray)
+                    p = Page(data=barray)
+                    p.num_cells = num_cells
+                    self.pages.append(p)
             
             return True
         else:
@@ -119,7 +129,12 @@ class Block():
 
             # Write each page into the file
             for i in range(n_pages):
-                barray = self.pages[i]
+                # Write Page metadata
+                num_cells = self.pages[i].num_cells
+                fp.write(struct.pack('<i', num_cells))
+
+                # Extract Page data
+                barray = self.pages[i].data
 
                 # TODO: Pass bytes into compression stream
 
@@ -140,31 +155,46 @@ class Block():
 
         Returns
         -------
-        pages : list<bytearray>
-            The list of pages (bytearrays)
+        pages : list<Page>
+            The list of Page objects
         """
 
         return self.pages
 
     def get_page(self, page_number):
-        """Get a specific page
+        """Get a specific Page
 
-        This returns a specific page in the Block
-        or None if the specified page doesn't
+        This returns a specific Page in the Block
+        or None if the specified Page doesn't
         exist.
 
         Parameters
         ----------
         page_number : int
-            The index of the page to find in the Block
+            The index of the Page to find in the Block
 
         Returns
         -------
-        page : bytearray
-            The specified page or None if it doesn't exist
+        p : Page
+            The specified Page or None if it doesn't exist
         """
 
         if (page_number < len(self.pages)):
             return self.pages[page_number]
         else:
             return None
+
+    def append(self, p):
+        """Append a Page
+
+        Append a Page to the existing Block object's 
+        list of pages.
+
+        Parameters
+        ----------
+        p : Page
+            A Page of data to append to the
+            list of pages
+        """
+
+        self.pages.append(p)
