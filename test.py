@@ -167,6 +167,37 @@ class TestLstroreDB(unittest.TestCase):
                 self.assertFalse(record)
 
                 break
+
+    def test_lazy_maintenance(self):
+        for i in range(1000):
+            self.query.insert(*[i]*5)
+
+            self.query.update(i, *[None, 2,2,2,2])
+
+        column = self.test_table.get_column(0)
+        self.assertEqual(len(column['Base']), len(column['Tail']))
+
+    def test_update_conflicting_primary_key(self):
+        self.query.insert(*[1]*5)
+        self.query.insert(*[2]*5)
+
+        value = self.query.update(2, *[1]*5)
+
+        self.assertFalse(value)
+
+    def test_insert_conflicting_primary_key(self):
+        self.query.insert(*[1]*5)
+        value = self.query.insert(*[1]*5)
+
+        self.assertFalse(value)
+
+    def test_update_non_conflicting_primary_key(self):
+        self.query.insert(*[1]*5)
+        self.query.insert(*[2]*5)
+
+        value = self.query.update(2, *[3]*5)
+
+        self.assertTrue(value)
     
 if __name__ == '__main__':
     unittest.main()
