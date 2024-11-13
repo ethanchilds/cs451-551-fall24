@@ -31,7 +31,7 @@ class Block():
     quickly retrieved and written between disk and RAM.
     """
 
-    def __init__(self, base_path, column, block_id, size):
+    def __init__(self, base_path, column, block_id, size=Config.pages_per_block):
         """Initialize the Block
 
         This sets up an initial Block with internal properties.
