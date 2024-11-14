@@ -7,22 +7,64 @@ name of the table, the number of columns, and the index of the key column. The d
 drops the specified table
 """
 
+# System imports
+import os
+import lzma
+
+# Local imports
 from lstore.table import Table
 from errors import TableNotUniqueError, TableDoesNotExistError
+from config import Config
 
 class Database():
     def __init__(self):
-        self.tables = {} # Dictionary of name - Table pairs
+        self.path = ''  # Path to the saved database
+        self.tables = {}  # Dictionary of name - Table pairs
 
-
-    # Not required for milestone1
     def open(self, path):
-        raise NotImplementedError
+        """Open an existing database
+        
+        Parameters
+        ----------
+        path : str
+            The path to the database file.  This will
+            be created if it doesn't already exist.
+        """
+
+        # Check if path is not empty
+        if (path != ''):
+            self.path = path
+
+            # Check if path already exists
+            if (os.path.exists(path)):
+                # Open the existing file
+                pass
+            else:
+                # Create the folder
+                os.makedirs(path)
+        else:
+            pass # TODO: Throw an error for invalid path
     
 
     def close(self):
-        raise NotImplementedError
-    
+        """Close the current database
+
+        This manages all of the bookkeeping
+        methods that need to be called to
+        keep the current database persistent
+        on disk.
+        """
+        
+        # Only close out if the stored path is proper
+        if (self.path != ''):
+            for k,t in self.tables.items():
+                # Create a folder for each table
+                pname = os.path.join(self.path, k)
+                if (not os.path.exists(pname)):
+                    os.makedirs(pname)
+                
+                # TODO: Write all dirty pages
+                pass
 
     def create_table(self, name, num_columns, key_index):
         """Creates a new table
