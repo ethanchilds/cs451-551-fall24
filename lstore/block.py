@@ -179,7 +179,7 @@ class Block():
             The specified Page or None if it doesn't exist
         """
 
-        if (page_number < len(self.pages)):
+        if (page_number < len(self.pages) and page_number >= 0):
             return self.pages[page_number]
         else:
             return None
