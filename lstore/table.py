@@ -73,14 +73,9 @@ class PageDirectory:
         """
         assert rid < self.num_records
         
-        # IMPORTANT TODO: this works for 64 bit integers, need to make some smart function for variable data types
-        page_capacity = Config.page_size // 8
         current_rid = rid
-        page_num = current_rid // page_capacity
-        order_in_page = current_rid % page_capacity
-
-        schema = self.data[Config.schema_encoding_column_idx]['Base'][page_num].read(order_in_page)
-        indirection = self.data[Config.indirection_column_idx]['Base'][page_num].read(order_in_page)
+        
+        indirection = self.get_column_value(current_rid, Config.indirection_column_idx, tail_flg=0)
 
         # return base record if there is only one version
         if indirection == -1: 
@@ -88,26 +83,18 @@ class PageDirectory:
 
         # get the latest version first
         current_rid = indirection
-        
-        page_num = current_rid // page_capacity
-        order_in_page = current_rid % page_capacity
 
         # from now on we are definetely working with tail
-        schema = self.data[Config.schema_encoding_column_idx]['Tail'][page_num].read(order_in_page)
-        indirection = self.data[Config.indirection_column_idx]['Tail'][page_num].read(order_in_page)
+        indirection = self.get_column_value(current_rid, Config.indirection_column_idx, tail_flg=1)
         
         # get the relative version by iterating backwards using the indirection pointer
         # we stop either if we reached the specified relative version or the primary tail record (in this case we return the base record)
         version = 0
         while version > relative_version and indirection != -1:
             current_rid = indirection
-            
-            page_num = current_rid // page_capacity
-            order_in_page = current_rid % page_capacity
 
             # from now on we are definetely working with tail
-            schema = self.data[Config.schema_encoding_column_idx]['Tail'][page_num].read(order_in_page)
-            indirection = self.data[Config.indirection_column_idx]['Tail'][page_num].read(order_in_page)
+            indirection = self.get_column_value(current_rid, Config.indirection_column_idx, tail_flg=1)
             version -= 1
 
         if version == relative_version:
