@@ -238,7 +238,7 @@ class Table:
 
         # Use the internal Index to find a record
         res = self.index.locate(self.primary_key, primary_key)[0]
-        return res[0]
+        return res
 
     def __len__(self):
         """Get the total number of Records
