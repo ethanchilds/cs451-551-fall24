@@ -1,0 +1,32 @@
+name: Run Tests
+
+on: [push, pull_request]
+
+jobs:
+  run-python-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Check out the code
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      # Install dependencies (if needed)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # Run each Python file
+      - name: Run Python files
+        run: |
+          python test.py
+          python exam_tester_m1.py
+          python m1_tester.py
+          python test_grader_assignment1.py
