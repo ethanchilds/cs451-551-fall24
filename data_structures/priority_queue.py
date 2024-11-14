@@ -207,3 +207,17 @@ class PriorityQueue():
         """
 
         return (key in self.map)
+
+    def __len__(self):
+        """Get the length of the queue
+
+        This returns the current number of elements
+        stored in the PriorityQueue.
+
+        Returns
+        -------
+        length : int
+            The total number of elements in the queue
+        """
+
+        return len(self.data)

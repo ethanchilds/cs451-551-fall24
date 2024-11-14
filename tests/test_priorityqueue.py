@@ -233,5 +233,25 @@ class TestPriorityQueue(unittest.TestCase):
         self.assertFalse(77 in p)
         self.assertFalse("B" in p)
 
+    def test_length(self):
+        """
+        Test the length function of the queue.
+        """
+
+        data = ["A", "B", "C", "D", "E", "F"]
+        p = PriorityQueue(len(data))
+
+        # Add data and assert length
+        for i,d in enumerate(data):
+            self.assertTrue(len(p) == i)
+            p.push(i, d)
+            self.assertTrue(len(p) == i+1)
+
+        # Remove data and assert length
+        for i in range(len(data)):
+            self.assertTrue(len(p) == len(data)-i)
+            p.pop()
+            self.assertTrue(len(p) == len(data)-i-1)
+
 if __name__ == '__main__':
     unittest.main()
