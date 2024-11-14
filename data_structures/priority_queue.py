@@ -208,6 +208,26 @@ class PriorityQueue():
 
         return (key in self.map)
 
+    def __getitem__(self, key):
+        """Try to retrieve an item
+
+        This attemps to retrieve an item by its key
+        from the internal queue.
+
+        Parameters
+        ----------
+        key : any
+            The uniquely identifying key
+
+        Returns
+        -------
+        item : list<int, any, any> or None
+            The item from the queue if it exists
+            or else None.
+        """
+
+        return self.get(key)
+
     def __len__(self):
         """Get the length of the queue
 

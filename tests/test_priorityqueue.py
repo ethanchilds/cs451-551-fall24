@@ -49,6 +49,7 @@ class TestPriorityQueue(unittest.TestCase):
         # Read each item
         for i,d in enumerate(data):
             self.assertTrue(p.get(i) == [0, i, d])
+            self.assertTrue(p[i] == [0, i, d])  # Equivalent call
 
     def test_multi_insert_out_capacity(self):
         """
@@ -68,8 +69,10 @@ class TestPriorityQueue(unittest.TestCase):
             if (i == 0):
                 # The first item should not exist
                 self.assertTrue(p.get(i) is None)
+                self.assertTrue(p[i] is None)  # Equivalent call
             else:
                 self.assertTrue(p.get(i) == [0, i, d])
+                self.assertTrue(p[i] == [0, i, d])  # Equivalent call
 
     def test_multi_insert_pop(self):
         """
