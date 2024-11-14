@@ -14,7 +14,7 @@ class TestPriorityQueue(unittest.TestCase):
 
     def test_invalid_capacity(self):
         """
-        Test that an invalid capacity is not allowed
+        Test that an invalid capacity is not allowed.
         """
 
         with self.assertRaises(PriorityQueueCapacityOutOfBoundsError) as context:

@@ -203,7 +203,7 @@ class PriorityQueue():
         Returns
         -------
         b : bool
-            Whether or not the key is in the queu
+            Whether or not the key is in the queue
         """
 
         return (key in self.map)
