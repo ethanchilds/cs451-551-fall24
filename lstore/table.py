@@ -343,7 +343,7 @@ class Table:
     def get_column(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
             raise ColumnDoesNotExist(column_index, self.num_columns)
-        return self.page_directory[column_index]
+        return self.page_directory.data[column_index]
     
     def add_base_page(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
