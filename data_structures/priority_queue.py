@@ -172,6 +172,36 @@ class PriorityQueue():
         else:
             return None
 
+    def remove(self, key):
+        """Try to remove an item
+
+        This attempts to remove an item by its key
+        from the internal queue.  If it is successful
+        the item is returned, or else None is returned.
+
+        Parameters
+        ----------
+        key : any
+            The uniquely identifying key
+        
+        Returns
+        -------
+        item : list<int, any, any> or None
+            The item from the queue that was removed
+            or else None.
+        """
+
+        # Quickly find the item using the hash map
+        if (key in self.map):
+            # Remove the item from the internal queue and hash map
+            item = self.map[key]
+            self.data.remove(item)
+            del self.map[key]
+            
+            return item
+        else:
+            return None
+
     def set_priority(self, key, priority):
         """Update the priority of an item
 

@@ -278,5 +278,27 @@ class TestPriorityQueue(unittest.TestCase):
         self.assertTrue(len(p) == 0)
         self.assertTrue(p.pop() is None)
 
+    def test_remove_existing(self):
+        """
+        Test removing existing items from the queue.
+        """
+
+        data = ["A", "B", "C", "D", "E", "F"]
+        removal_order = [5,3,1,2,0,4]
+        p = PriorityQueue(len(data))
+
+        # Add all data
+        for i,d in enumerate(data):
+            p.push(i, d)
+
+        # Try to remove existing items out of order
+        for r in removal_order:
+            self.assertTrue(r in p)
+            p.remove(r)
+            self.assertTrue(r not in p)
+        
+        # Check all elements are removed
+        self.assertTrue(len(p) == 0)
+
 if __name__ == '__main__':
     unittest.main()
