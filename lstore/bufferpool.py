@@ -9,15 +9,16 @@ class BufferPool:
         """
         self.block_size = block_size
         self.cache_size = cache_size
+        self.page_count = 0
 
 
-    def append_page(self, page_id):
+    def append_page(self, page_id, cache_update=True):
         pass
     
     
-    def get_page(self, page_id):
+    def get_page(self, page_id, cache_update=True):
         pass
         
-    def update_page(self, page_id):
+    def update_page(self, page_id, cache_update=True):
         pass
         
