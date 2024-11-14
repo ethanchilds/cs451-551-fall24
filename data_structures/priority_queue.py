@@ -52,6 +52,18 @@ class PriorityQueue():
         self.map = {}  # Used for fast finding a particular item
         heapq.heapify(self.data)
 
+    def clear(self):
+        """Clear the entire queue
+
+        This removes all elements in the current queue
+        and their corresponding entries in the hash map.
+        """
+
+        # Destroy all elements
+        self.data = []
+        self.map = {}
+        heapq.heapify(self.data)
+
     def push(self, key, value, priority=0):
         """Try to push a value
 

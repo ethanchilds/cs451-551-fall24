@@ -256,5 +256,27 @@ class TestPriorityQueue(unittest.TestCase):
             p.pop()
             self.assertTrue(len(p) == len(data)-i-1)
 
+    def test_clear(self):
+        """
+        Test clearing all entries.
+        """
+
+        data = ["A", "B", "C", "D", "E", "F"]
+        p = PriorityQueue(len(data))
+
+        # Clear before adding
+        p.clear()
+        self.assertTrue(len(p) == 0)
+        self.assertTrue(p.get(0) is None)
+        self.assertTrue(p[0] is None)  # Equivalent call
+
+        # Clear after adding
+        for i,d in enumerate(data):
+            p.push(i, d)
+        self.assertTrue(len(p) == len(data))
+        p.clear()
+        self.assertTrue(len(p) == 0)
+        self.assertTrue(p.pop() is None)
+
 if __name__ == '__main__':
     unittest.main()
