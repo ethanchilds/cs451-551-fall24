@@ -189,6 +189,28 @@ class TestPriorityQueue(unittest.TestCase):
         # Set invalid priority
         self.assertFalse(p.set_priority(4, 9))
 
+    def test_pop_invalid(self):
+        """
+        Test popping past the total number of elements.
+        """
+
+        N = 3
+        data = ["A", "B"]
+        p = PriorityQueue(3)
+
+        # Pop early
+        self.assertTrue(p.pop() is None)
+
+        # Add data
+        for i,d in enumerate(data):
+            p.push(i, d)
+
+        # Remove all data
+        for i,d in enumerate(data):
+            p.pop()
+
+        # Pop past existing data
+        self.assertTrue(p.pop() is None)
 
 if __name__ == '__main__':
     unittest.main()
