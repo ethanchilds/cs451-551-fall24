@@ -188,3 +188,22 @@ class PriorityQueue():
             return True
         else:
             return False
+
+    def __contains__(self, key):
+        """Check for inclusion
+
+        This checks if a specific key exists
+        in the current queue.
+
+        Parameters
+        ----------
+        key : any
+            The uniquely identifying key
+
+        Returns
+        -------
+        b : bool
+            Whether or not the key is in the queu
+        """
+
+        return (key in self.map)

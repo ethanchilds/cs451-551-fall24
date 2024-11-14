@@ -196,7 +196,7 @@ class TestPriorityQueue(unittest.TestCase):
 
         N = 3
         data = ["A", "B"]
-        p = PriorityQueue(3)
+        p = PriorityQueue(N)
 
         # Pop early
         self.assertTrue(p.pop() is None)
@@ -211,6 +211,27 @@ class TestPriorityQueue(unittest.TestCase):
 
         # Pop past existing data
         self.assertTrue(p.pop() is None)
+
+    def test_contains_key(self):
+        """
+        Test whether a queue contains specific keys.
+        """
+
+        data = ["A", "B", "C"]
+        keys = [68, 22, 91]
+        p = PriorityQueue(len(data))
+
+        # Add data
+        for i,d in enumerate(data):
+            p.push(keys[i], d)
+        
+        # Check valid keys
+        for k in keys:
+            self.assertTrue(k in p)
+        
+        # Check invalid keys
+        self.assertFalse(77 in p)
+        self.assertFalse("B" in p)
 
 if __name__ == '__main__':
     unittest.main()
