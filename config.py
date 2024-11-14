@@ -8,6 +8,8 @@ from data_structures.hash_map import HashMap
 class Config:
     page_size = 2**12    #4KB
     page_cell_size = 8   # Thats what the adssignment description said.
+    pages_per_block = 2**4  # Total pages that exist in a single block file
+    pool_max_blocks = 2**12  # Total number of blocks that can be stored in the BufferPool at a time
     index_ordered_data_structure = BSTree    # Make sure this class passes test_data_structure_correctness(), and does well on it.
     index_unordered_data_structure = HashMap
     b_plus_tree_minimum_degree = 2**7   # 2**6 to 2**7 for fast insert. 2**8 to 2**9 for fast range query

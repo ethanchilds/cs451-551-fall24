@@ -14,9 +14,13 @@ from config import Config
 from errors import PageNoCapacityError, PageValueTooLargeError, PageKeyError
 
 class Page:
-    def __init__(self, page_size=Config.page_size, cell_size=Config.page_cell_size):
+    def __init__(self, page_size=Config.page_size, cell_size=Config.page_cell_size, data=None):
         self.num_cells = 0
-        self.data = bytearray(page_size)
+        if (data is not None):
+            # Preallocated data
+            self.data = data
+        else:
+            self.data = bytearray(page_size)
         self.cell_size = cell_size
         self.page_id = id(self)
 

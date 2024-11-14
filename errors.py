@@ -142,3 +142,9 @@ class NonUniqueKeyError(BPlusTreeError):
 class KeyError(BPlusTreeError):
     def __init__(self, key):
         super().__init__(f"Key {key} is not in the B+ Tree")
+
+"""PriorityQueue ERRORS"""
+class PriorityQueueCapacityOutOfBoundsError(Exception):
+    def __init__(self, capacity):
+        self.message = f"The given capacity {0} is out of bounds.".format(capacity)
+        super().__init__(self.message)
