@@ -91,6 +91,7 @@ class PriorityQueue():
         if (key in self.map):
             # Increment the priority
             self.map[key][0] += 1  # Max queue increment
+            heapq.heapify(self.data)  # TODO: Check performance
 
             return None
 
@@ -102,12 +103,10 @@ class PriorityQueue():
         if (len(self.data) < self.capacity):
             # Add the new item to the queue
             heapq.heappush(self.data, new_item)
-            heapq.heapify(self.data)  # TODO: Check performance
             return None
         else:
             # Queue is at capacity, so remove before adding
             item = heapq.heappushpop(self.data, new_item)
-            heapq.heapify(self.data)  # TODO: Check performance
             last_key = item[1]  # Extract key
             del self.map[last_key]
             return item
