@@ -33,13 +33,14 @@ class Index:
         self.benchmark_mode = benchmark_mode
         self.debug_mode = debug_mode
 
-        self.create_index(column_number=table.primary_key, ordered=True)
+        self.create_index(column_number=table.primary_key, ordered=False)
         
 
     def locate(self, column: int, value):
         """
         returns the location of all records with the given value on column "column"
         """
+        self._apply_maintenance(column)
         if column >= len(self.indices) or column < 0:
             raise ColumnDoesNotExist
 
@@ -59,6 +60,7 @@ class Index:
         
         returns list of (value, rid) pairs
         """
+        self._apply_maintenance(column)
         self.usage_histogram[column][1] += 1
 
         if self.indices[column]:
