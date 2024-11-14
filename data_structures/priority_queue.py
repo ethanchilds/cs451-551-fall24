@@ -159,3 +159,32 @@ class PriorityQueue():
             return self.map[key]
         else:
             return None
+
+    def set_priority(self, key, priority):
+        """Update the priority of an item
+
+        This tries to set a specific priority on an
+        item stored in the current queue.  If the
+        operation is successful it will return True,
+        or else it will return False.
+
+        Parameters
+        ----------
+        key : any
+            The uniquely identifying key
+        priority : int
+            The new priority value
+
+
+        Returns
+        -------
+        status : bool
+            Whether or not the operation succeeded
+        """
+
+        if (key in self.map):
+            self.map[key][0] = priority
+            heapq.heapify(self.data)
+            return True
+        else:
+            return False

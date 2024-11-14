@@ -142,6 +142,53 @@ class TestPriorityQueue(unittest.TestCase):
         for i,d in enumerate(pop_order):
             self.assertTrue(p.pop()[2] == d)
 
+    def test_set_priority(self):
+        """
+        Test manually adjusting the priority.
+        """
+
+        data = ["A", "B", "C"]
+        keys = [0, 1, 2]
+        priorities = [5, 6, 2]
+        p = PriorityQueue(len(data))
+
+        # Add data with priority manually
+        for i,d in enumerate(data):
+            p.push(keys[i], d, priorities[i])
+
+        # Check all items
+        pop_order = ["C", "A", "B"]
+        for i,d in enumerate(pop_order):
+            self.assertTrue(p.pop()[2] == d)
+
+        # Add data with default priority
+        for i,d in enumerate(data):
+            p.push(keys[i], d)
+
+        # Perform set priority function
+        for i,k in enumerate(keys):
+            p.set_priority(k, priorities[i])
+
+        # Check all items
+        for i,d in enumerate(pop_order):
+            self.assertTrue(p.pop()[2] == d)
+
+    def test_set_invalid_priority(self):
+        """
+        Test setting a priority on an invalid key.
+        """
+
+        data = ["A", "B", "C"]
+        keys = [0, 1, 2]
+        p = PriorityQueue(len(data))
+
+        # Add data
+        for i,d in enumerate(data):
+            p.push(keys[i], d)
+
+        # Set invalid priority
+        self.assertFalse(p.set_priority(4, 9))
+
 
 if __name__ == '__main__':
     unittest.main()
