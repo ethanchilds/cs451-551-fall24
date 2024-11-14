@@ -44,7 +44,7 @@ class Block():
         ----------
         base_path : str
             The path to the base directory where the
-            data will be stored (database/table)
+            data will be stored (<database>/<table>/<type>)
         column : int
             The column number that this block corresponds to
         block_id : int
@@ -102,6 +102,17 @@ class Block():
             # No existing data
             return False
 
+    def discard(self):
+        """Discards the contents of the Block
+
+        Remove all elements within the current
+        Block.
+        """
+
+        # Delete internal data
+        del self.pages
+        self.pages = []
+
     def write(self):
         """Write data to the disk and discard pages
 
@@ -142,8 +153,7 @@ class Block():
                 fp.write(barray)
 
         # Delete internal data
-        del self.pages
-        self.pages = []
+        self.discard()
 
         return True
 
