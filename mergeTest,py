@@ -119,6 +119,45 @@ class TestLstroreDB(unittest.TestCase):
 
             self.assertListEqual(test_record, record)
 
+    def test_update_not_back_to_back_base_pages_merge(self):
+        for i in range(1536):
+            self.query.insert(*[i]*5)
+
+        for i in range(512):
+            update_record = [i+1]*5
+            update_record[0] = None
+            self.query.update(i, *update_record)
+
+        for i in range(1024,1536):
+            update_record = [i+1]*5
+            update_record[0] = None
+            self.query.update(i, *update_record)
+
+        self.test_table.merge()
+
+
+        for i in range(1536):
+            updated = None
+
+            if i >= 1024 or i < 512:
+                updated = True
+            else:
+                updated = False
+
+            record = []
+            for j in range(5):
+                value = self.test_table.page_directory.get_column_value(i, j + Config.column_data_offset)
+                record.append(value)
+
+            if updated:
+                test_record = [i+1]*5
+                test_record[0] = i
+                self.assertListEqual(record, test_record)
+            elif not updated:
+                test_record = [i]*5
+                self.assertListEqual(record, test_record)
+                
+
 
 if __name__ == '__main__':
     unittest.main()
