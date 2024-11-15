@@ -91,7 +91,7 @@ class Database():
         if (name in self.tables):
             raise TableNotUniqueError
         
-        table = Table(name, num_columns, key_index)
+        table = Table(self.path, name, num_columns, key_index)
         self.tables[name] = table
 
         return table

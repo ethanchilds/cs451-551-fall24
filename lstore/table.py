@@ -13,6 +13,7 @@ from time import time
 from lstore.page import Page
 from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsInvalidError
 from config import Config
+from lstore.pool import BufferPool
 
 
 class Record:
@@ -39,13 +40,19 @@ class PageDirectory:
     indexable.
     """
 
-    def __init__(self, num_columns):
+    def __init__(self, db_path, table_name, num_columns):
+        self.db_path = db_path
+        self.table_name = table_name
         self.num_records = 0
         self.num_tail_records = 0
         self.num_columns = num_columns
-        self.data = []
-        for _ in range(0, num_columns):
-            self.data.append({'Base':[], 'Tail':[]})
+        # self.data = []
+        # for _ in range(0, num_columns):
+        #     self.data.append({'Base':[], 'Tail':[]})
+        self.bufferpool = BufferPool(
+            base_path=db_path + '/' + table_name,
+            num_columns=num_columns
+        )
 
     def add_record(self, columns, tail_flg = 0):
         """
@@ -53,13 +60,21 @@ class PageDirectory:
         """
         assert len(columns) == self.num_columns
 
-        page_class = 'Base' if tail_flg == 0 else 'Tail'
+        # page_class = 'Base' if tail_flg == 0 else 'Tail'
 
         for i, column_value in enumerate(columns):
-            # allocate new base page if we are at full capacity
-            if (not self.data[i][page_class]) or (not self.data[i][page_class][-1].has_capacity()):
-                self.data[i][page_class].append(Page())
-            self.data[i][page_class][-1].write(column_value)
+            # allocate new page if we are at full capacity
+            # if (not self.data[i][page_class]) or (not self.data[i][page_class][-1].has_capacity()):
+            #     self.data[i][page_class].append(Page())
+            # self.data[i][page_class][-1].write(column_value)
+            last_page = self.bufferpool.get_last_page(column_id=i, tail_flg=tail_flg)
+            if last_page is None or (not last_page.has_capacity()):
+                new_page = Page()
+                new_page.write(column_value)
+                self.bufferpool.add_page(new_page, column_id=i, tail_flg=tail_flg)
+            else:
+                last_page.write(column_value)
+                self.bufferpool.mark_dirty_page(-1, column_id=i, tail_flg=tail_flg)
 
         if tail_flg == 0:
             self.num_records += 1
@@ -106,7 +121,7 @@ class PageDirectory:
 
         assert 1 == 0 # shouldn't reach this part
     
-    def get_column_value(self, rid, column_id, tail_flg = 0):
+    def get_column_value(self, rid, column_id, tail_flg = 0, cache_update=True):
         assert column_id < self.num_columns
 
         page_capacity = Config.page_size // 8
@@ -115,12 +130,14 @@ class PageDirectory:
 
         if tail_flg == 0:
             assert rid < self.num_records
-            return self.data[column_id]['Base'][page_num].read(order_in_page)
+            # return self.data[column_id]['Base'][page_num].read(order_in_page)
+            return self.bufferpool.get_page(page_num, column_id, tail_flg=0, cache_update=cache_update).read(order_in_page)
         else:
             assert rid < self.num_tail_records
-            return self.data[column_id]['Tail'][page_num].read(order_in_page)
+            # return self.data[column_id]['Tail'][page_num].read(order_in_page)
+            return self.bufferpool.get_page(page_num, column_id, tail_flg=1, cache_update=cache_update).read(order_in_page)
         
-    def set_column_value(self, rid, column_id, new_value, tail_flg = 0):
+    def set_column_value(self, rid, column_id, new_value, tail_flg = 0, cache_update=True):
         assert column_id >= 0 
         assert column_id < self.num_columns
 
@@ -130,14 +147,16 @@ class PageDirectory:
 
         if tail_flg == 0:
             assert rid < self.num_records
-            self.data[column_id]['Base'][page_num].write_at_location(new_value, order_in_page)
+            page = self.bufferpool.get_page(page_num, column_id, tail_flg=0, cache_update=cache_update)
+            page.write_at_location(new_value, order_in_page)
+            self.bufferpool.mark_dirty_page(page_num, column_id, tail_flg=0, cache_update=cache_update)
+            # !!! Do we need to update explicitly here??? self.bufferpool.update
+            # self.data[column_id]['Base'][page_num].write_at_location(new_value, order_in_page)
         else:
             assert rid < self.num_tail_records
-            self.data[column_id]['Tail'][page_num].write_at_location(new_value, order_in_page)
-
-
-
-
+            page = self.bufferpool.get_page(page_num, column_id, tail_flg=1, cache_update=cache_update)
+            page.write_at_location(new_value, order_in_page)
+            self.bufferpool.mark_dirty_page(page_num, column_id, tail_flg=1, cache_update=cache_update)
 
 class Table:
     """A Table defines a unique grouping of records
@@ -149,7 +168,7 @@ class Table:
     for individual records to be retrieved by value.
     """
 
-    def __init__(self, name, num_columns, primary_key):
+    def __init__(self, db_path, name, num_columns, primary_key):
         """Initialize a Table
 
         Parameters
@@ -176,10 +195,11 @@ class Table:
             raise TotalColumnsInvalidError(num_columns)
 
         # Set internal state
+        self.db_path = db_path
         self.name = name
         self.primary_key = primary_key
         self.num_columns = num_columns
-        self.page_directory = PageDirectory(num_columns + Config.column_data_offset)
+        self.page_directory = PageDirectory(self.db_path, self.name, num_columns + Config.column_data_offset)
         self.index = Index(self)
         
     def __contains__(self, key):
