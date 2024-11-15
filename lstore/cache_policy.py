@@ -140,8 +140,8 @@ class LeakyBucketCachePolicy(CachePolicy):
         Every step that the queue gets updated,
         all elements decrement down to zero.
         """
-        for k in self.queue.map:
-            old_priority = self.queue.get(k)[0]
+        for k,v in self.queue.items():
+            old_priority = v[0]
             self.queue.set_priority(k, max(old_priority - 1, 0))
 
     def update_priority(self, old_priority):
@@ -184,8 +184,9 @@ class InverseLeakyBucketCachePolicy(CachePolicy):
         Every step that the queue gets updated,
         all elements increment up to zero.
         """
-        for k in self.queue.map:
-            old_priority = self.queue.get(k)[0]
+        #for k in self.queue.map:
+        for k,v in self.queue.items():
+            old_priority = v[0]
             self.queue.set_priority(k, min(old_priority + 1, 0))
 
     def update_priority(self, old_priority):

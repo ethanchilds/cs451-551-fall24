@@ -10,7 +10,8 @@ map that stores unique keys to the item itself.
 import heapq
 
 # Local imports
-from errors import PriorityQueueCapacityOutOfBoundsError
+from errors import PriorityQueueCapacityOutOfBoundsError, PriorityQueueInvalidPolicyError
+from lstore.cache_policy import CachePolicy
 
 class PriorityQueue():
     """A fixed-size priority queue
@@ -51,6 +52,7 @@ class PriorityQueue():
         self.data = []  # Actual priority queue
         self.map = {}  # Used for fast finding a particular item
         heapq.heapify(self.data)
+        self.policy = CachePolicy(self)  # Default cache policy
 
     def clear(self):
         """Clear the entire queue
@@ -99,10 +101,16 @@ class PriorityQueue():
             or else None will be returned
         """
 
+        # Perform push policy update
+        self.policy.on_push()
+
         # Check if the new item is already in the queue
         if (key in self.map):
             # Increment the priority
-            self.map[key][0] += 1  # Max queue increment
+            old_priority = self.map[key][0]
+            new_priority = self.policy.update_priority(old_priority)
+            self.map[key][0] = new_priority
+            #self.map[key][0] += 1  # Max queue increment
             heapq.heapify(self.data)  # TODO: Check performance
 
             return None
@@ -197,10 +205,63 @@ class PriorityQueue():
             item = self.map[key]
             self.data.remove(item)
             del self.map[key]
-            
+
             return item
         else:
             return None
+
+    def items(self, ordered=False):
+        """Key value generator
+
+        This is a key-value generator for iterating
+        through all key value pairs of items within
+        the current queue.  This does not guarantee
+        iterating in priority order unless the
+        ordered flag is set to True.
+
+        Parameters
+        ----------
+        ordered : bool
+            Whether or not the yielded items are
+            in sorted priority order
+
+        Yields
+        ------
+        key : any
+            The uniquely identifying key
+        item : list<int, any, any>
+            The item from the queue
+        """
+
+        if (ordered):
+            for d in self.data:
+                yield d[1], d
+        else:
+            for k,v in self.map.items():
+                yield k, v
+
+    def set_policy(self, policy):
+        """Set the cache priority update policy
+
+        This sets the internal cache priority update
+        policy which auto-applies any time that push
+        is called.
+
+        Parameters
+        ----------
+        policy : CachePolicy
+            The policy for auto updating priorities in the cache
+
+        Raises
+        ------
+        PriorityQueueInvalidPolicyError
+            If the provided policy is invalid
+        """
+
+        if (isinstance(policy, CachePolicy)):
+            self.policy = policy
+        else:
+            raise PriorityQueueInvalidPolicyError()
 
     def set_priority(self, key, priority):
         """Update the priority of an item
@@ -225,7 +286,12 @@ class PriorityQueue():
         """
 
         if (key in self.map):
+            #prev_priority = self.map[key][0]
             self.map[key][0] = priority
+            #if (priority < prev_priority):
+            #    heapq._siftdown(self.data, )
+            #elif (priority > prev_priority):
+            #    heapq._siftup(self.data, )
             heapq.heapify(self.data)
             return True
         else:

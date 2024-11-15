@@ -4,6 +4,7 @@ import unittest
 # Internal imports
 from data_structures.priority_queue import PriorityQueue
 from errors import PriorityQueueCapacityOutOfBoundsError
+from lstore.cache_policy import LRUCachePolicy
 
 class TestPriorityQueue(unittest.TestCase):
     def setUp(self):
@@ -98,6 +99,8 @@ class TestPriorityQueue(unittest.TestCase):
 
         data = ["A", "A", "A"]
         p = PriorityQueue(1)
+        policy = LRUCachePolicy(p)
+        p.set_policy(policy)
 
         # Insert all items
         for _,d in enumerate(data):
@@ -135,6 +138,8 @@ class TestPriorityQueue(unittest.TestCase):
         data = ["A", "A", "B", "B", "B", "C"]
         keys = [0, 0, 1, 1, 1, 2]
         p = PriorityQueue(N)
+        policy = LRUCachePolicy(p)
+        p.set_policy(policy)
 
         # Insert all items
         for i,d in enumerate(data):
