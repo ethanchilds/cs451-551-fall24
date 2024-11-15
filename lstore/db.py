@@ -36,10 +36,7 @@ class Database():
             self.path = path
 
             # Check if path already exists
-            if (os.path.exists(path)):
-                # Open the existing file
-                pass
-            else:
+            if (not os.path.exists(path)):
                 # Create the folder
                 os.makedirs(path)
         else:
@@ -63,8 +60,8 @@ class Database():
                 if (not os.path.exists(pname)):
                     os.makedirs(pname)
                 
-                # TODO: Write all dirty pages
-                pass
+                # Write all dirty pages
+                t.flush()
 
     def create_table(self, name, num_columns, key_index):
         """Creates a new table
