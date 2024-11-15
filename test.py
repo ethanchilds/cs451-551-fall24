@@ -60,6 +60,11 @@ class TestLstroreDB(unittest.TestCase):
             record = self.query.select_version(0,0, [1]*5, version)[0]
             self.assertListEqual(test_dict[key], record.columns)
 
+    def test_update_non_existent_record(self):
+        value = self.query.update(0, *[None]*5)
+
+        self.assertFalse(value)
+
     def test_select_version_too_far_back(self):
         # testing if select version were to be given a version that does not exist, will it return base version
         # if there is only 2 versions but asked for 3 versions back, return base

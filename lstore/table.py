@@ -9,10 +9,13 @@ the periodical merge of its corresponding page ranges.
 
 
 from lstore.index import Index
+import lstore.utils as utils
+import copy
 from time import time
 from lstore.page import Page
 from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsInvalidError
 from config import Config
+from data_structures.queue import Queue
 
 
 class Record:
@@ -148,8 +151,25 @@ class PageDirectory:
             assert rid < self.num_tail_records
             self.data[column_id]['Tail'][page_num].write_at_location(new_value, order_in_page)
 
-
-
+    def get_page_copy(self, column, page_idx, tail_flg = 0):
+        if tail_flg == 0:
+            copy_page = copy.deepcopy(self.data[column]['Base'][page_idx])
+            return copy_page
+        elif tail_flg == 1:
+            copy_page = copy.deepcopy(self.data[column]['Tail'][page_idx])
+            return copy_page
+        
+    def get_page(self, column, page_idx, tail_flg = 0):
+        if tail_flg == 0:
+            return self.data[column]['Base'][page_idx]
+        elif tail_flg == 1:
+            return self.data[column]['Tail'][page_idx]
+        
+    def overwrite_page(self, new_page, column, page_idx, tail_flg=0):
+        if tail_flg == 0:
+            self.data[column]['Base'][page_idx] = new_page
+        elif tail_flg == 1:
+            self.data[column]['Tail'][page_idx] = new_page
 
 
 class Table:
@@ -343,7 +363,7 @@ class Table:
     def get_column(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
             raise ColumnDoesNotExist(column_index, self.num_columns)
-        return self.page_directory[column_index]
+        return self.page_directory.data[column_index + Config.column_data_offset]
     
     def add_base_page(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
@@ -369,5 +389,57 @@ class Table:
 
     def __merge(self):
         print("merge is happening")
-        pass
+        # Which tail pages are going to be merged
+        # This needs to be discussed
+        tail_page_indices = [0, 1, 2]
+
+        for tail_page_idx in tail_page_indices:
+
+            if tail_page_idx >= len(self.page_directory.data[tail_page_idx]['Tail']):
+                # we shouldn't be calling merge when there are no records to merge
+                # raise error, we are trying to merge records that don't exist
+                break
+
+            # still need to include tps tracking
+            # get the tail page rid and schema columms
+            page_rid = self.page_directory.get_page(Config.tps_and_brid_column_idx, tail_page_idx, 1)
+            page_schema = self.page_directory.get_page(Config.schema_encoding_column_idx, tail_page_idx, 1)
+
+            # initialize base_copies, this will be where we manage the copied pages
+            base_copies = []
+            for i in range(self.num_columns):
+                base_copies.append({})
+
+            for i in range(self.num_columns):
+                # get the column we will work on
+                tail = self.page_directory.get_page(i + Config.column_data_offset, tail_page_idx, 1)
+                # track if an RID has been seen yet, we iterate backwards so we only merge the most recent update
+                # instead of seen I would like to use TPS, this may prevent some possible errors
+                seen = set() 
+
+                for j in range(tail.num_cells-1, -1, -1):
+                    record_value = tail.read(j) # value we might update
+                    rid = page_rid.read(j) # rid of base record we might update
+                    # get the page index so we know which base page will be updated
+                    base_page_idx = int(rid // (Config.page_size / Config.page_cell_size))
+
+                    # if the base page has not been copied and brought in, do so
+                    if base_page_idx not in base_copies[i]:
+                        base = self.page_directory.get_page_copy(i + Config.column_data_offset, base_page_idx)
+                        base_copies[i][base_page_idx] = base
+                    
+                    # if the record has not been updated yet
+                    if rid not in seen:
+                        seen.add(rid)
+                        # if the column has been updated at this spot, update it
+                        if utils.get_bit(page_schema.read(j), i):
+                            location = int(rid % (Config.page_size / Config.page_cell_size))
+                            base_copies[i][base_page_idx].write_at_location(record_value, location)
+
+            # overwrite base page with new
+            for i in range(len(base_copies)):
+                for key in base_copies[i].keys():
+                    self.page_directory.overwrite_page(base_copies[i][key], i+Config.column_data_offset, key)
  
+    def merge(self):
+        self.__merge()

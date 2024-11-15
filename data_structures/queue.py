@@ -1,14 +1,19 @@
 import threading
 import unittest
 import random
-from linked_list import LinkedList
+from data_structures.linked_list import LinkedList
 
 class Queue:
 
-    def __init__(self):
+    def __init__(self, elements = None):
         self.queue = LinkedList()
         self.lock = threading.Lock()
         self.size = 0
+        
+        if elements:
+            self.size = len(elements)
+            for element in elements:
+                self.queue.push(element)
 
     def push(self, data):
         with self.lock:
@@ -71,6 +76,18 @@ class TestQueue(unittest.TestCase):
             self.q.pop()
 
         self.assertEqual(len(self.q), 0)
+
+    def test_passed_in_elements(self):
+        elements = range(self.n)
+        test_queue = Queue(elements)
+
+        self.assertEqual(self.n, len(test_queue))
+
+        for element in elements:
+            value = test_queue.pop()
+            self.assertEqual(value, element)
+
+        self.assertEqual(0, len(test_queue))
 
 if __name__ == '__main__':
     unittest.main()
