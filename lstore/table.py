@@ -19,6 +19,7 @@ from data_structures.queue import Queue
 import threading
 from lstore.pool import BufferPool
 import os
+import math
 import struct
 
 
@@ -471,7 +472,8 @@ class Table:
 
         for tail_page_idx in tail_page_indices:
             page_capacity = Config.page_size // 8
-            if tail_page_idx >= self.page_directory.num_tail_records // page_capacity:
+            num_tail_pages = math.ceil(self.page_directory.num_tail_records / page_capacity)
+            if tail_page_idx >= num_tail_pages:
                 # we shouldn't be calling merge when there are no records to merge
                 # raise error, we are trying to merge records that don't exist
                 break
@@ -544,6 +546,8 @@ class Table:
                             cache_update=True
                         )
                         new_tps = tail_rid.read(j)
+                        # if new_tps == -1:
+                        #     print('HERE')
                         self.page_directory.set_column_value(rid, Config.tps_and_brid_column_idx, new_tps)
 
             # overwrite base page with new
