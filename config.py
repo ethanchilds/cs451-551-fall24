@@ -16,12 +16,13 @@ class Config:
     b_plus_tree_search_algorithm_threshold = 10 # Switch between a linear scan and binary search in b+ tree at this value. Might improve performance.
     b_plus_tree_bulk_insert_threshold = 0
     lstore_is_cumulative = False    # Paper mentions there are two ways to do this.
-    column_data_offset = 4
+    column_data_offset = 5
     byteorder = 'big'
     indirection_column_idx = 0
     rid_column_idx = 1
     timestamp_column_idx = 2
     schema_encoding_column_idx = 3
+    tps_and_brid_column_idx = 4
     benchmark_mode = False
 
     # Best time to insert 100_000 random items into a b+ tree with minimum_degree.
