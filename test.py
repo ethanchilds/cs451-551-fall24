@@ -167,7 +167,106 @@ class TestLstroreDB(unittest.TestCase):
                 self.assertFalse(record)
 
                 break
-    
+
+class TestLstoreIndex(unittest.TestCase):
+    """
+    THE BEHAVIOR OF THE INDEX
+
+    locate method: column, value -> list of rid's; applies maintinance
+    locate range method: low_key, high_key, column -> list of rid's; applies maintenance
+    maintain_insert: doesn't apply immediately. Except pk. That needs to go in immediately (because it has to be unique)
+    maintain_update: applies maintinance. new pk can't exist
+    maintain_delete: applies maintinance. 
+    _apply_maintainance: loops through maintenance lists and bulk inserts. Can't do on pk.
+    """
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.create_table("Table", 4, 0)
+        self.index = self.table.index
+        self.index.automatic_new_indexes = False
+        self.table.index.create_index(1, ordered=True)
+        self.table.index.create_index(2, ordered=False)
+        self.query = Query(self.table)
+
+    def test_insert_duplicate_pk(self):
+        self.query.insert(0, 0, 0, 0)
+        self.assertFalse(self.query.insert(0, 1, 1, 1))
+        
+    def test_insert_duplicate_non_pk(self):
+        self.query.insert(0, 0, 0, 0)
+        self.assertTrue(self.query.insert(1, 0, 0, 0))
+        rids1 = self.index.locate(1, 0)
+        rids2 = self.index.locate(2, 0)
+        self.assertEqual(rids1, [0, 1])
+        self.assertEqual(rids1, rids2)
+
+    def test_locate_on_empty_index(self):
+        v1 = self.index.locate_range(-1000, 1000, 1)
+        v2 = self.index.locate_range(-1000, 1000, 2)
+        self.assertEqual(v1, [])
+        self.assertEqual(v1, v2)
+
+    def test_basic_locate(self):
+        self.assertTrue(self.query.insert(1, 10, 10, 10))
+        self.assertTrue(self.query.insert(2, 20, 20, 10))
+
+        v1 = self.index.locate(1, 10)
+        v2 = self.index.locate(2, 10)
+        
+        self.assertEqual(v1, v2)
+        self.assertEqual(self.index.locate_range(10, 20, 1), self.index.locate_range(10, 20, 2))
+
+    def test_basic_locate_duplicates(self):
+        # TODO: only the primary key needs unique keys. MAKE SURE LAZY INDEXING DOESN'T MESS EVERYTHING UP!!!
+        self.query.insert(1, 8, 8, 8)
+        self.query.insert(2, 8, 8, 8)
+        self.assertFalse(self.query.insert(1, 9, 9, 9))
+
+        v1 = self.index.locate(1, 8)
+        v2 = self.index.locate(2, 8)
+        
+        self.assertEqual(len(v1), 2)  
+        self.assertEqual(v1, v2)
+
+    def test_locate_duplicates(self):
+        num_items = 1_000
+        for i in range(num_items):
+            self.query.insert(i, 8, 8, 8)
+
+        len1 = len(self.index.locate(1, 8))
+        len2 = len(self.index.locate(2, 8))
+
+        # KNOWN BUG WITH B+TREE!!! THIS TEST FAILS!!!
+        self.assertEqual(len1, num_items)
+        self.assertEqual(len1, len2)
+
+    def test_updates_pk(self):
+        for i in range(5):
+            if i != 3:
+                self.query.insert(i, i, i, i)
+
+        self.assertTrue(self.query.update(0, *[3, None, None, None]))
+        values = self.index.locate_range(0, 7, 0)
+        self.assertEqual(values, [1, 2, 0, 3])
+
+    def test_updates_pk_doesnt_exist(self):
+        for i in range(5):
+            self.query.insert(i, i, i, i)
+
+        self.assertFalse(self.query.update(-1, *[10, None, None, None]))
+
+    def test_updates_new_pk_exists(self):
+        for i in range(5):
+            self.query.insert(i, i, i, i)
+
+        self.assertFalse(self.query.update(0, *[1, None, None, None]))
+        
+        
+        
+
+
+
+
 if __name__ == '__main__':
     unittest.main()
 

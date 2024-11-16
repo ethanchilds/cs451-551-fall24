@@ -13,6 +13,7 @@ from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
 import lstore.utils as utils
+from errors import *
 from config import Config
 import datetime
 
@@ -201,6 +202,15 @@ class Query:
         # should be only one base rid
         assert len(relevant_rids) == 1
 
+        try:
+            self.table.index.maintain_update(primary_key, columns)
+        except NonUniqueKeyError:
+            return False
+        except KeyError:
+            return False
+        except Exception as e:
+            raise e
+
         columns_values = [-1] * (len(columns) + Config.column_data_offset)
 
         # need base meta information
@@ -267,7 +277,6 @@ class Query:
         )
         # assert self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, tail_flg=0) == columns_values[Config.schema_encoding_column_idx]
         
-        self.table.index.maintain_update(primary_key, columns)
         # assert len(self.table.index.locate(self.table.primary_key, primary_key)) == 1
         return True
 
