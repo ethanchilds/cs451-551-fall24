@@ -55,6 +55,7 @@ class TestLstroreDB(unittest.TestCase):
         self.assertListEqual([0,0,999,999,999], record)
 
     def test_several_records_one_update_merge(self):
+        # be aware this may be a faulty test case
         for i in range(514):
             self.query.insert(*[i]*5)
 
@@ -62,6 +63,8 @@ class TestLstroreDB(unittest.TestCase):
         new_update = [random_key]*5
         new_update[0] = None
         self.query.update(random_key, *new_update)
+
+        self.test_table.merge()
 
         record = []
         for i in range(5):
@@ -199,6 +202,21 @@ class TestLstroreDB(unittest.TestCase):
 
             updated_record[0] = 1
             self.assertListEqual(updated_record, record)
+
+    def test_tps_update(self):
+        for i in range(513):
+            self.query.insert(*[i]*5)
+
+        for i in range(513):
+            updated_record = [i+1]*5
+            updated_record[0] = None
+            self.query.update(i, *updated_record)
+
+        self.test_table.merge()
+
+        for i in range(513):
+            tps = self.test_table.page_directory.get_column_value(i, Config.tps_and_brid_column_idx)
+            self.assertEqual(tps, i)
 
 
 if __name__ == '__main__':

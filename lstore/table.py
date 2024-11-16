@@ -11,11 +11,12 @@ the periodical merge of its corresponding page ranges.
 from lstore.index import Index
 import lstore.utils as utils
 import copy
-from time import time
+import time
 from lstore.page import Page
 from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsInvalidError
 from config import Config
 from data_structures.queue import Queue
+import threading
 
 
 class Record:
@@ -47,6 +48,7 @@ class PageDirectory:
         self.num_tail_records = 0
         self.num_columns = num_columns
         self.data = []
+        self.num_tail_pages = 0
         for _ in range(0, num_columns):
             self.data.append({'Base':[], 'Tail':[]})
 
@@ -58,11 +60,17 @@ class PageDirectory:
 
         page_class = 'Base' if tail_flg == 0 else 'Tail'
 
+        new_page = False
         for i, column_value in enumerate(columns):
             # allocate new base page if we are at full capacity
             if (not self.data[i][page_class]) or (not self.data[i][page_class][-1].has_capacity()):
                 self.data[i][page_class].append(Page())
+                if not new_page:
+                    new_page = True
             self.data[i][page_class][-1].write(column_value)
+
+        if new_page and tail_flg:
+            self.num_tail_pages += 1
 
         if tail_flg == 0:
             self.num_records += 1
@@ -182,7 +190,7 @@ class Table:
     for individual records to be retrieved by value.
     """
 
-    def __init__(self, name, num_columns, primary_key):
+    def __init__(self, name, num_columns, primary_key, force_merge = True):
         """Initialize a Table
 
         Parameters
@@ -212,9 +220,22 @@ class Table:
         self.name = name
         self.primary_key = primary_key
         self.num_columns = num_columns
+        self.force_merge = force_merge
         self.page_directory = PageDirectory(num_columns + Config.column_data_offset)
         self.index = Index(self)
-        
+
+        # Merge policy features
+
+        if self.force_merge == False:
+            self.interval = 1
+            self.running = True
+            self.num_tail_pages = 0
+            self.num_tails_to_merge = 1
+            self.tail_queue = Queue()
+            thread = threading.Thread(target=self.__run, daemon=True)
+            thread.start()
+
+
     def __contains__(self, key):
         """Implements the contains operator
         
@@ -387,15 +408,14 @@ class Table:
         # Set the RID column value to -1 (invalid)
         self.page_directory.set_column_value(rid, Config.rid_column_idx, -1, 0)
 
-    def __merge(self):
-        print("merge is happening")
+    def __merge(self, tail_page_indices):
+        #print("merge is happening")
         # Which tail pages are going to be merged
         # This needs to be discussed
-        tail_page_indices = [0, 1, 2]
 
         for tail_page_idx in tail_page_indices:
 
-            if tail_page_idx >= len(self.page_directory.data[tail_page_idx]['Tail']):
+            if tail_page_idx >= len(self.page_directory.data[0]['Tail']):
                 # we shouldn't be calling merge when there are no records to merge
                 # raise error, we are trying to merge records that don't exist
                 break
@@ -406,6 +426,7 @@ class Table:
             page_schema = self.page_directory.get_page(Config.schema_encoding_column_idx, tail_page_idx, 1)
 
             # initialize base_copies, this will be where we manage the copied pages
+            tps_copies = {}
             base_copies = []
             for i in range(self.num_columns):
                 base_copies.append({})
@@ -426,6 +447,8 @@ class Table:
                     # if the base page has not been copied and brought in, do so
                     if base_page_idx not in base_copies[i]:
                         base = self.page_directory.get_page_copy(i + Config.column_data_offset, base_page_idx)
+                        tps = self.page_directory.get_page_copy(Config.tps_and_brid_column_idx, base_page_idx)
+                        tps_copies[base_page_idx] = tps
                         base_copies[i][base_page_idx] = base
                     
                     # if the record has not been updated yet
@@ -436,10 +459,34 @@ class Table:
                             location = int(rid % (Config.page_size / Config.page_cell_size))
                             base_copies[i][base_page_idx].write_at_location(record_value, location)
 
+                    tps = self.page_directory.get_column_value(rid, Config.tps_and_brid_column_idx)
+                    if not tps >= rid:
+                        tail_rid = self.page_directory.get_page(Config.rid_column_idx, tail_page_idx, 1)
+                        new_tps = tail_rid.read(j)
+                        self.page_directory.set_column_value(rid, Config.tps_and_brid_column_idx, new_tps)
+
             # overwrite base page with new
             for i in range(len(base_copies)):
                 for key in base_copies[i].keys():
                     self.page_directory.overwrite_page(base_copies[i][key], i+Config.column_data_offset, key)
  
     def merge(self):
-        self.__merge()
+        self.__merge(tail_page_indices = [0, 1, 2])
+
+    def __run(self):
+        while self.running:
+            old_num_tails = self.num_tail_pages 
+            new_num_tails = self.page_directory.num_tail_pages
+            if new_num_tails >= 2:
+                self.num_tail_pages = new_num_tails
+                for i in range(old_num_tails, new_num_tails):
+                    self.tail_queue.push(i)
+
+            if not self.tail_queue.isEmpty():
+                tails_to_merge = []
+                for i in range(self.num_tails_to_merge):
+                    value = self.tail_queue.pop()
+                    tails_to_merge.append(value)
+
+                self.__merge(tails_to_merge)
+            time.sleep(self.interval)
