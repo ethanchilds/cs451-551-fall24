@@ -99,9 +99,9 @@ class Query:
         try:
             self.table.page_directory.add_record(columns_values)
             self.table.index.maintain_insert(columns, new_rid)
-
+    
             return True
-        except:
+        except Exception as e:
             return False
     
     """
