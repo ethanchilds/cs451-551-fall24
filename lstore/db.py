@@ -65,7 +65,7 @@ class Database():
                 t.close()
 
 
-    def create_table(self, name, num_columns, key_index, force_merge=True):
+    def create_table(self, name, num_columns, key_index, force_merge=False):
         """Creates a new table
 
         Parameters

@@ -273,7 +273,7 @@ class Table:
 
         if self.force_merge == False:
             # Only adjust interval and num tails to merge
-            self.interval = 1
+            self.interval = 30
             self.num_tails_to_merge = 1
 
             # DO NOT TOUCH
