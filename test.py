@@ -301,38 +301,34 @@ class TestLstoreIndex(unittest.TestCase):
             self.query.insert(i, i, i, i)
 
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
-
-    def test_do_stuff_on_column_3(self):
-        self.index.automatic_new_indexes = True
-        for i in range(5):
-            self.query.insert(i, i, i, 2*i)
-
-        self.index.locate(column=3, value=4)
-        self.assertTrue(self.index.indices[3] is not None)
         
-# from random import shuffle
-# class UltimateLstoreTest(unittest.TestCase):
-#     """
-#     This is the ultimate lstore test
-#     Every query
-#     Every column
-#     Every order
-#     """
-#     def setUp(self):
-#         self.database = Database()
-#         self.table = self.database.creaet_table("Test Table", 0, 3)
-#         self.query = Query(self.table)
+from random import shuffle
+class UltimateLstoreTest(unittest.TestCase):
+    """
+    This is the ultimate lstore test
+    Every query
+    Every column
+    Every order
+    """
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.creaet_table("Test Table", 0, 3)
+        self.query = Query(self.table)
 
-#     def test_everything_all_at_once(self):
-#         queries = []
-#         for i in range(1_000_000):
-#             if i < 900_000:
-#                 queries.append((i, -i, 2*i))
-#             else:
-#                 queries.append((i, i % 31, i % 727))
+    def test_everything_all_at_once(self):
+        queries = []
+        for i in range(1_000_000):
+            if i < 900_000:
+                queries.append((i, -i, 2*i))
+            else:
+                queries.append((i, i % 31, i % 727))
 
-#         queries += queries
-#         shuffle(queries)
+        queries += queries
+        
+        for q in queries:
+            self.query.insert(*q)
+
+        print(self.query.select())
         
         
 
