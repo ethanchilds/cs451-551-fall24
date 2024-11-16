@@ -163,7 +163,7 @@ class Index:
             return
         
         if self.usage_histogram[column][1] >= 2 or self.usage_histogram[column][0] >= 2:
-            self.create_index(column, ordered=True)
+            self.create_index(column, ordered=True, unique_keys=False)
     
     def _apply_maintenance(self, column):
         if self.indices[column] is not None and self.has_unique_keys[column] == False:

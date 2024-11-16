@@ -94,7 +94,6 @@ class Query:
             self.table.page_directory.add_record(columns_values)
             return True
         except Exception as e:
-            print(e)
             return False
     
     """
