@@ -273,7 +273,12 @@ class Table:
 
         if self.force_merge == False:
             # Only adjust interval and num tails to merge
+<<<<<<< Updated upstream
             self.interval = 30
+=======
+            self.interval = 1
+            # when changing this value not all unit test will run because they were coded with intention of 1
+>>>>>>> Stashed changes
             self.num_tails_to_merge = 1
 
             # DO NOT TOUCH
@@ -577,8 +582,10 @@ class Table:
             if not self.tail_queue.isEmpty():
                 tails_to_merge = []
                 for i in range(self.num_tails_to_merge):
-                    value = self.tail_queue.pop()
-                    tails_to_merge.append(value)
+                    # BAD CODE REWRITE
+                    if not self.tail_queue.isEmpty():
+                        value = self.tail_queue.pop()
+                        tails_to_merge.append(value)
 
                 self.__merge(tails_to_merge)
             time.sleep(self.interval)
