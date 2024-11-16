@@ -227,10 +227,13 @@ class Table:
         # Merge policy features
 
         if self.force_merge == False:
+            # Only adjust interval and num tails to merge
             self.interval = 1
+            self.num_tails_to_merge = 1
+
+            # DO NOT TOUCH
             self.running = True
             self.num_tail_pages = 0
-            self.num_tails_to_merge = 1
             self.tail_queue = Queue()
             thread = threading.Thread(target=self.__run, daemon=True)
             thread.start()
