@@ -211,8 +211,8 @@ class Table:
                 self.num_columns = struct.unpack('<i', fp.read(4))[0]
                 self.primary_key = struct.unpack('<i', fp.read(4))[0]
         else:
-            self.num_records = 0
-            self.num_tail_records = 0
+            num_records = 0
+            num_tail_records = 0
             self.num_columns_file = num_columns
             self.primary_key = primary_key
             
