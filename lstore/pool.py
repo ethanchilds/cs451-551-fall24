@@ -64,7 +64,7 @@ class BufferPool():
 
         # Create a list of pins and dirty blocks
         # self.pinned_blocks
-        self.dirty_blocks = []
+        self.dirty_blocks = set()
 
     def flush(self):
         """Flush all dirty blocks to disk
@@ -74,94 +74,86 @@ class BufferPool():
         """
 
         # Loop through all dirty_blocks and write them to disk
-        for b in self.dirty_blocks:
-            b.write()
+        for key in self.dirty_blocks:
+            if key in self.queue:
+                block = self.queue[key][2] 
+                block.write()
+            else:
+                assert 1 == 0
 
         # Remove all items in the queue and pinned/dirty lists
         self.queue.clear()
         self.pinned_blocks = []
         self.dirty_blocks = []
-
-    def __policy__(self, old_value):
-        """Compute the policy on a given priority
-
-        Compute the internal policy on a given priority
-        value to allow it to update a priority queue.
-
-        Parameters
-        ----------
-        old_value : int
-            The old priority value
-
-        Returns
-        -------
-        new_value : int
-            The new priority value
-        """
-        return (old_value + 1)  # TODO: Abstract default policy
     
-    def add_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
+    def add_page(self, page, page_num, column_id, tail_flg=0, cache_update=True):
         block_num = page_num // self.block_size
-        path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
-        block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
-        block.read()
+        
+        # we use the combination of table path, column, tail and block_num as the unique identifier of the block
+        block = self._get_block(self.base_path, column_id, tail_flg, block_num)
+        
         block.append(page)
-        self.dirty_blocks.append(block)
+        
+        
         if cache_update:
-            key = (self.base_path, column_id, tail_flg, block_num)
-            value = block
-            self._maintain_cache(key, value)
+            # we use the combination of table path, column, tail and block_num as the unique identifier of the block
+            self._maintain_cache(self.base_path, column_id, tail_flg, block_num, block)
+            self.dirty_blocks.add((self.base_path, column_id, tail_flg, block_num))
         else:
             block.write()
 
-    def get_page(self, page_num, column_id, tail_flg=0, cache_update=False) -> Page:
+    def get_page(self, page_num, column_id, tail_flg=0, cache_update=True) -> Page:
         # If the item is in the BufferPool, just return it
         # and apply the cache policy to the existing item
         block_num = page_num // self.block_size
-        key = (self.base_path, column_id, tail_flg, block_num)
-        
-        if (key in self.queue):
-            # Extract the item and its current priority
-            block = self.queue.get(key)
-            # old_priority = item[0]
 
-            # # Set the new priority according to the internal policy
-            # new_priority = self.__policy__(old_priority)
-            # self.queue.set_priority(key, new_priority)
-
-            # # Return the item
-        else:
-            path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
-            block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
-            block.read()
+        block = self._get_block(self.base_path, column_id, tail_flg, block_num)
         
         order_in_block = page_num % self.block_size
         assert order_in_block < len(block.pages)
         
         page = block.pages[order_in_block]
-        if cache_update:
-            key = (self.base_path, column_id, tail_flg, block_num)
-            value = block
-            self._maintain_cache(key, value)
-        else:
-            block.write()
         
+        if cache_update:
+            # we use the combination of table path, column, tail and block_num as the unique identifier of the block
+            self._maintain_cache(self.base_path, column_id, tail_flg, block_num, block)
+            
         return page
         
-    def update_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
+    def update_page(self, page, page_num, column_id, tail_flg=0, cache_update=True):
         block_num = page_num // self.block_size
+        block = self._get_block(self.base_path, column_id, tail_flg, block_num)
+        
         order_in_block = page_num % self.block_size
-        path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
-        block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
-        block.read()
         block.pages[order_in_block] = page
+        
         if cache_update:
-            self.dirty_blocks.append(block)
-            key = (self.base_path, column_id, tail_flg, block_num)
-            value = block
-            self._maintain_cache(key, value)
+            # we use the combination of table path, column, tail and block_num as the unique identifier of the block
+            self._maintain_cache(self.base_path, column_id, tail_flg, block_num, block)
+            self.dirty_blocks.add((self.base_path, column_id, tail_flg, block_num))
         else:
             block.write()
+            
+    def _get_block(self, path, column_id, tail_flg, block_num):
+        key = (path, column_id, tail_flg, block_num)
+        
+        if key in self.queue:
+            block = self.queue[key][2]
+        else:
+            path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
+            block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
+            block.read()
+        return block
+    
+    def _maintain_cache(self, path, column_id, tail_flg, block_num, block):
+        key = (path, column_id, tail_flg, block_num)
+        value = block
+        result = self.queue.push(key, value)
+        # check if the evicted block is dirty and remove it
+        if result is not None and (result[1] in self.dirty_blocks):
+            result[2].write()
+            self.dirty_blocks.remove(result[1])            
+        
 
 
 class CachePolicy():
