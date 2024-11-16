@@ -273,12 +273,7 @@ class Table:
 
         if self.force_merge == False:
             # Only adjust interval and num tails to merge
-<<<<<<< Updated upstream
             self.interval = 30
-=======
-            self.interval = 1
-            # when changing this value not all unit test will run because they were coded with intention of 1
->>>>>>> Stashed changes
             self.num_tails_to_merge = 1
 
             # DO NOT TOUCH
