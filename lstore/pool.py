@@ -48,16 +48,16 @@ class BufferPool():
         self.base_path = base_path
         self.max_blocks = max_blocks
         self.block_size = block_size
-        if (not os.path.exists(base_path + '/base')):
-            os.makedirs(base_path + '/base')
-            os.makedirs(base_path + '/tail')
+        if (not os.path.exists(os.path.join(base_path, 'base'))):
+            os.makedirs(os.path.join(base_path, 'base'))
+            os.makedirs(os.path.join(base_path, 'tail'))
         
         # Create a folder for each column
         for i in range(num_columns):
-            if (not os.path.exists(base_path + '/base/' + str(i))):
-                os.makedirs(base_path + '/base/' + str(i))
-            if (not os.path.exists(base_path + '/tail/' + str(i))):
-                os.makedirs(base_path + '/tail/' + str(i))
+            if (not os.path.exists(os.path.join(base_path, 'base', str(i)))):
+                os.makedirs(os.path.join(base_path, 'base', str(i)))
+            if (not os.path.exists(os.path.join(base_path, 'tail', str(i)))):
+                os.makedirs(os.path.join(base_path, 'tail', str(i)))
         
         # Create a priority queue corresponding to each Block
         self.queue = PriorityQueue(max_blocks)
@@ -102,7 +102,7 @@ class BufferPool():
     
     def add_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
         block_num = page_num // self.block_size
-        path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+        path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
         block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
         block.read()
         block.append(page)
@@ -131,7 +131,7 @@ class BufferPool():
 
             # # Return the item
         else:
-            path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+            path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
             block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
             block.read()
         
@@ -151,7 +151,7 @@ class BufferPool():
     def update_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
         block_num = page_num // self.block_size
         order_in_block = page_num % self.block_size
-        path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+        path = os.path.join(self.base_path, ('base' if tail_flg == 0 else 'tail'), str(column_id))
         block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
         block.read()
         block.pages[order_in_block] = page

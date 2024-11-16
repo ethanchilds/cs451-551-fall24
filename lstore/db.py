@@ -133,7 +133,7 @@ class Database():
             or `None` if not found.
         """
         
-        table_path = os.path.exists(self.path + '/' + name)
+        table_path = os.path.exists(os.path.join(self.path, name))
         
         if (name not in self.tables) and not os.path.exists(table_path):
             raise TableDoesNotExistError(f"cannot get table `{name}` because it does not exist")

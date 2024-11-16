@@ -55,7 +55,7 @@ class PageDirectory:
         # for _ in range(0, num_columns):
         #     self.data.append({'Base':[], 'Tail':[]})
         self.bufferpool = BufferPool(
-            base_path=db_path + '/' + table_name,
+            base_path=os.path.join(db_path, table_name),
             num_columns=num_columns
         )
 
@@ -203,7 +203,7 @@ class Table:
         self.num_columns = num_columns
         
         # restore num_records and num_tail_records if they exist
-        meta_path = db_path + '/' + name + '/' + 'meta.data'
+        meta_path = os.path.join(db_path, name, 'meta.data')
         if os.path.exists(meta_path):
             with open(meta_path, 'rb') as fp:
                 num_records = struct.unpack('<i', fp.read(4))[0]
@@ -403,7 +403,7 @@ class Table:
         
     def close(self):
         # dump record data
-        meta_path = self.db_path + '/' + self.name + '/' + 'meta.data'
+        meta_path = os.path.join(self.db_path, self.name, 'meta.data')
         with open(meta_path, 'wb') as fp:
                 fp.write(struct.pack('<i', self.page_directory.num_records))
                 fp.write(struct.pack('<i', self.page_directory.num_tail_records))
