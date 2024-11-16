@@ -178,7 +178,7 @@ class PageDirectory:
             page.write_at_location(new_value, order_in_page)
             self.bufferpool.update_page(page, page_num, column_id, tail_flg=1, cache_update=cache_update)
 
-  '''
+'''
   def get_page_copy(self, column, page_idx, tail_flg = 0):
         if tail_flg == 0:
             copy_page = copy.deepcopy(self.data[column]['Base'][page_idx])
@@ -470,16 +470,18 @@ class Table:
         # This needs to be discussed
 
         for tail_page_idx in tail_page_indices:
-
-            if tail_page_idx >= len(self.page_directory.data[0]['Tail']):
+            page_capacity = Config.page_size // 8
+            if tail_page_idx >= self.page_directory.num_tail_records // page_capacity:
                 # we shouldn't be calling merge when there are no records to merge
                 # raise error, we are trying to merge records that don't exist
                 break
 
             # still need to include tps tracking
             # get the tail page rid and schema columms
-            page_rid = self.page_directory.get_page(Config.tps_and_brid_column_idx, tail_page_idx, 1)
-            page_schema = self.page_directory.get_page(Config.schema_encoding_column_idx, tail_page_idx, 1)
+            # page_rid = self.page_directory.get_page(Config.tps_and_brid_column_idx, tail_page_idx, 1)
+            # page_schema = self.page_directory.get_page(Config.schema_encoding_column_idx, tail_page_idx, 1)
+            page_rid = self.page_directory.bufferpool.get_page(tail_page_idx, Config.tps_and_brid_column_idx, tail_flg=1, cache_update=True)
+            page_schema = self.page_directory.bufferpool.get_page(tail_page_idx, Config.schema_encoding_column_idx, tail_flg=1, cache_update=True)
 
             # initialize base_copies, this will be where we manage the copied pages
             tps_copies = {}
@@ -489,7 +491,8 @@ class Table:
 
             for i in range(self.num_columns):
                 # get the column we will work on
-                tail = self.page_directory.get_page(i + Config.column_data_offset, tail_page_idx, 1)
+                # tail = self.page_directory.get_page(i + Config.column_data_offset, tail_page_idx, 1)
+                tail = self.page_directory.bufferpool.get_page(tail_page_idx,i + Config.column_data_offset, tail_flg=1, cache_update=True)
                 # track if an RID has been seen yet, we iterate backwards so we only merge the most recent update
                 # instead of seen I would like to use TPS, this may prevent some possible errors
                 seen = set() 
@@ -502,8 +505,24 @@ class Table:
 
                     # if the base page has not been copied and brought in, do so
                     if base_page_idx not in base_copies[i]:
-                        base = self.page_directory.get_page_copy(i + Config.column_data_offset, base_page_idx)
-                        tps = self.page_directory.get_page_copy(Config.tps_and_brid_column_idx, base_page_idx)
+                        # base = self.page_directory.get_page_copy(i + Config.column_data_offset, base_page_idx)
+                        base_source = self.page_directory.bufferpool.get_page(
+                            base_page_idx,
+                            i + Config.column_data_offset,
+                            tail_flg=0,
+                            cache_update=True
+                        )
+                        base = copy.deepcopy(base_source)
+                        
+                        # tps = self.page_directory.get_page_copy(Config.tps_and_brid_column_idx, base_page_idx)
+                        tps_source = self.page_directory.bufferpool.get_page(
+                            base_page_idx,
+                            Config.tps_and_brid_column_idx,
+                            tail_flg=0,
+                            cache_update=True
+                        )
+                        tps = copy.deepcopy(tps_source)
+                        
                         tps_copies[base_page_idx] = tps
                         base_copies[i][base_page_idx] = base
                     
@@ -517,14 +536,27 @@ class Table:
 
                     tps = self.page_directory.get_column_value(rid, Config.tps_and_brid_column_idx)
                     if not tps >= rid:
-                        tail_rid = self.page_directory.get_page(Config.rid_column_idx, tail_page_idx, 1)
+                        # tail_rid = self.page_directory.get_page(Config.rid_column_idx, tail_page_idx, 1)
+                        tail_rid = self.page_directory.bufferpool.get_page(
+                            tail_page_idx,
+                            Config.rid_column_idx,
+                            tail_flg=1,
+                            cache_update=True
+                        )
                         new_tps = tail_rid.read(j)
                         self.page_directory.set_column_value(rid, Config.tps_and_brid_column_idx, new_tps)
 
             # overwrite base page with new
             for i in range(len(base_copies)):
                 for key in base_copies[i].keys():
-                    self.page_directory.overwrite_page(base_copies[i][key], i+Config.column_data_offset, key)
+                    # self.page_directory.overwrite_page(base_copies[i][key], i+Config.column_data_offset, key)
+                    self.page_directory.bufferpool.update_page(
+                        page=base_copies[i][key],
+                        page_num=key,
+                        column_id=i+Config.column_data_offset,
+                        tail_flg=0,
+                        cache_update=True
+                    )
  
     def merge(self):
         self.__merge(tail_page_indices = [0, 1, 2])
