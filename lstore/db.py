@@ -91,7 +91,7 @@ class Database():
             raise TableNotUniqueError
         
 
-        table = Table(self.path, name, num_columns, key_index, force_merged)
+        table = Table(self.path, name, num_columns, key_index, force_merge)
         self.tables[name] = table
 
         return table
