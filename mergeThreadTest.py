@@ -203,13 +203,13 @@ class TestLstroreDB(unittest.TestCase):
     def test_tps_update(self):
         for i in range(512):
             self.query.insert(*[i]*5)
-
+    
         for i in range(512):
             updated_record = [i+1]*5
             updated_record[0] = None
             self.query.update(i, *updated_record)
         
-        self.query.update(i, *[0]*5)
+        self.query.update(0, *[0]*5)
 
         time.sleep(self.test_table.interval)
 

@@ -549,7 +549,7 @@ class Table:
                         # if new_tps == -1:
                         #     print('HERE')
                         self.page_directory.set_column_value(rid, Config.tps_and_brid_column_idx, new_tps)
-
+            
             # overwrite base page with new
             for i in range(len(base_copies)):
                 for key in base_copies[i].keys():
