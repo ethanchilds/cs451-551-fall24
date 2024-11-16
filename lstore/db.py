@@ -18,7 +18,7 @@ from config import Config
 
 class Database():
     def __init__(self):
-        self.path = ''  # Path to the saved database
+        self.path = './TEMP'  # Path to the saved database
         self.tables = {}  # Dictionary of name - Table pairs
 
     def open(self, path):
