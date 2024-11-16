@@ -39,7 +39,7 @@ class TestLstroreDB(unittest.TestCase):
 
         self.assertListEqual(record, [1,2,2,2,2])
 
-    def test_several_records_one_update_merge(self):
+    def test_one_records_several_update_merge(self):
         self.query.insert(*[0]*5)
 
         for i in range(1000):
@@ -156,7 +156,49 @@ class TestLstroreDB(unittest.TestCase):
             elif not updated:
                 test_record = [i]*5
                 self.assertListEqual(record, test_record)
-                
+
+    def test_merge_after_merge(self):
+        for i in range(513):
+            self.query.insert(*[i]*5)
+
+        for i in range(513):
+            updated_record = [i+1]*5
+            updated_record[0] = None
+            self.query.update(i, *updated_record)
+
+        self.test_table.merge()
+        self.test_table.merge()
+
+        for i in range(513):
+            record = []
+            for j in range(5):
+                value = self.test_table.page_directory.get_column_value(i, j + Config.column_data_offset)
+                record.append(value)
+
+            test_record = [i+1]*5
+            test_record[0] = i
+
+            self.assertListEqual(record, test_record)
+
+    def test_merge_update_loop(self):
+        N = 513
+
+        self.query.insert(*[1]*5)
+
+        for i in range(N):
+            updated_record = [1+i+2]*5
+            updated_record[0] = None
+            self.query.update(1, *updated_record)
+
+            self.test_table.merge()
+
+            record = []
+            for j in range(5):
+                value = self.test_table.page_directory.get_column_value(0, j + Config.column_data_offset)
+                record.append(value)
+
+            updated_record[0] = 1
+            self.assertListEqual(updated_record, record)
 
 
 if __name__ == '__main__':
