@@ -140,8 +140,13 @@ class NonUniqueKeyError(BPlusTreeError):
         super().__init__(f"Attempted to insert the existing key {key} in B+ Tree Unique Key Mode")
 
 class KeyError(BPlusTreeError):
-    def __init__(self, key):
-        super().__init__(f"Key {key} is not in the B+ Tree")
+    def __init__(self, key, value=None):
+        if value is None:
+            message = f"Key {key} is not in the B+ Tree"
+        else:
+            message = f"Key value pair ({key}, {value}) is not in the B+ Tee"
+
+        super().__init__(message)
 
 """PriorityQueue ERRORS"""
 class PriorityQueueCapacityOutOfBoundsError(Exception):
@@ -153,3 +158,4 @@ class PriorityQueueInvalidPolicyError(Exception):
     def __init__(self):
         self.message = "The given policy is not a valid CachePolicy."
         super().__init__(self.message)
+

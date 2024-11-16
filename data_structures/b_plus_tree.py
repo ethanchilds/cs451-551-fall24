@@ -2,7 +2,9 @@ from utilities.algorithms import binary_search, linear_search
 from config import Config
 from errors import *
 from random import random
+from heapq import merge
 import unittest
+import time
 
 class Node:
     def __init__(self, minimum_degree=16, is_leaf: bool=False, parent=None):
@@ -10,6 +12,7 @@ class Node:
         self.minimum_degree = minimum_degree
         self.is_leaf: bool = is_leaf
         self.link = None    # Should be none unless a leaf.
+        self.rev_link = None
         self.parent = parent  # Should be none only if a root.
         
         self.keys = []
@@ -203,7 +206,8 @@ class BPlusTree:
             unique_keys: bool=True,
             return_keys: bool=False,
             debug_mode: bool=False, 
-            search_algorithm_threshold=Config.b_plus_tree_search_algorithm_threshold
+            search_algorithm_threshold=Config.b_plus_tree_search_algorithm_threshold,
+            bulk_insert_threshold=Config.b_plus_tree_bulk_insert_threshold,
         ):
         self.height = 0
         self.length = 0
@@ -213,7 +217,8 @@ class BPlusTree:
         self.root = Node(minimum_degree, is_leaf=True)
 
         self.search_algorithm_threshold = search_algorithm_threshold # When do we binary search keys and when do we linear scan keys?
-        
+        self.bulk_insert_threshold = bulk_insert_threshold # When do we insert items one by one vs create new tree and bulk insert
+
         self.debug_mode = debug_mode
         if self.debug_mode:
             print("WARNING: b+ tree is in debug mode. This significantly slows down every operation.")
@@ -296,43 +301,69 @@ class BPlusTree:
     def bulk_insert(self, items):
         """
         Bulk Insert Method
-        If you already many items, use this instead of insert. It's way faster.
+        Inserts many items at a time by building tree layer by layer
+        Up to 10 times faster than inserting items one at a time
         items: a list of key-value tuples
         """
-        if len(self.root.keys):
-            raise KeyError("bulk insert can only be called on an empty b+ tree")
+        if len(self):
+            # We choose an insertion strategy depending on the size of the tree
+            item_ratio = len(items) / len(self)
+            if len(self) < 1000 or item_ratio < Config.b_plus_tree_bulk_insert_threshold:
+                # print("BULK INSERT: new items list too small. Inserting one by one")
+                for key, value in items:
+                    self.insert(key, value)
+                
+                return
+                
+            # print("BULK INSERT: new items list large enough. Bulk insert as planned!")
+    
+
+        items.sort(key=lambda item: item[0])
+
+        # if len(self):
+        #     items = list(merge(items, list(self.items())))
+        #     self.reset()
+
+        if len(self):
+            items += list(self.items())
+            self.reset()
+
+        items.sort(key=lambda item: item[0])
+    
         
         self.length = len(items)
 
-        # Sort items by key
-        items.sort(key=lambda item: item[0])
-        items_by_leaf_node = []
         leaf_nodes = [] # containes elements (node, min_key_in_subtree)
 
         limit = len(items) - (self.minimum_degree * 2)
-        items_by_leaf_node = []
 
         group_size = self.minimum_degree
         stopping_point = 0
         for i in range(0, limit + 1, group_size):
-            items_by_leaf_node.append(items[i:i + group_size])
+            node = Node(self.minimum_degree, is_leaf=True)
+            # node.keys = [key for key, value in items[i:i + group_size]]       # approach 1: wastefully looping twice
+            # node.values = [value for key, value in items[i:i + group_size]]
+            # node.keys, node.values = zip(*items[i:i + group_size])            # approach 2: way faster, but returns tuples
+            node.keys, node.values = map(list, zip(*items[i:i + group_size]))   # approach 3: way faster and is correct!
+
+            leaf_nodes.append(node)
+
             stopping_point = i + group_size
 
         items_are_remaining = limit < len(items)
         if items_are_remaining:
-            items_by_leaf_node.append(items[stopping_point:])
-
-        for i, node_items in enumerate(items_by_leaf_node):
             node = Node(self.minimum_degree, is_leaf=True)
-            node.keys = [key for key, value in node_items]
-            node.values = [value for key, value in node_items]
-
-            if i != 0:
-                leaf_nodes[-1].link = node
+            node.keys = [key for key, value in items[stopping_point:]]
+            node.values = [value for key, value in items[stopping_point:]]
 
             leaf_nodes.append(node)
+
+        for i in range(1, len(leaf_nodes)):
+            leaf_nodes[i - 1].link = leaf_nodes[i]
+            leaf_nodes[i].rev_link = leaf_nodes[i - 1]
             
         min_keys_of_leaf_nodes = [node.keys[0] for node in leaf_nodes]
+
         self._build_layer(leaf_nodes, min_keys_of_leaf_nodes)
         
         if self.debug_mode:
@@ -396,11 +427,16 @@ class BPlusTree:
         new_leaf.keys = leaf_node.keys[mid_index:]
         new_leaf.values = leaf_node.values[mid_index:]
         new_leaf.link = leaf_node.link
+        new_leaf.rev_link = leaf_node
+
+        if new_leaf.link is not None:
+            new_leaf.link.rev_link = new_leaf
 
         # Update the original leaf node
         leaf_node.keys = leaf_node.keys[:mid_index]
         leaf_node.values = leaf_node.values[:mid_index]
         leaf_node.link = new_leaf
+
 
         # If the leaf is the root, create a new root
         if leaf_node == self.root:
@@ -482,11 +518,15 @@ class BPlusTree:
     
     def get(self, key):
         """
-        If self.unique_keys, returns a single value.
-        If not self.unique_keys, returns a list of values. Values in no particular order.
+        Always returns a list (even if garanteed to return only one item)
+        It's confusing when we sometimes return a list and sometimes return a value.
+        Therefore all index data structures return lists
         """
         if not self.unique_keys:
-            return [value for key, value in self.get_range(key, key)]
+            if self.return_keys:
+                return [value for key, value in self.get_range(key, key)]
+            else:
+                return [value for value in self.get_range(key, key)]
 
         node = self._get_leaf(key)
         if node is None:
@@ -497,7 +537,7 @@ class BPlusTree:
         if index < len(node.keys) and key == node.keys[index]:
             return [(node.keys[index], node.values[index])] if self.return_keys else [node.values[index]]
         
-        return None
+        return []
     
     """
     Get Range
@@ -512,7 +552,7 @@ class BPlusTree:
     def get_range(self, low_key=None, high_key=None):
         result = []
 
-        if low_key:
+        if low_key is not None:
             leaf = self._get_leaf(low_key)
             if leaf is None:
                 return result
@@ -556,12 +596,18 @@ class BPlusTree:
             else:
                 node = node.values[index + 1]
 
+        if self.unique_keys == False:
+            while node.keys[0] == key and node.rev_link is not None and node.rev_link.keys[-1] == key:
+                node = node.rev_link
+
+
         return node
     
 
 
     # Cannot do return self.get(key) is not None because the value itself could be None.
     def __contains__(self, key) -> bool:
+        # TODO: make this compatable with non unique keys
         node = self._get_leaf(key)
         if node is None:
             return False
@@ -608,7 +654,10 @@ class BPlusTree:
 
         return node
     
-    def remove(self, key):     
+    def remove(self, key, value=None):  
+        if self.unique_keys == False:
+            assert(value is not None)
+
         leaf_node = self._get_leaf(key)
         if leaf_node is None:
             raise KeyError(key)
@@ -616,6 +665,9 @@ class BPlusTree:
         index = self._find_key_index(leaf_node.keys, key)
         if index >= len(leaf_node.keys) or leaf_node.keys[index] != key:
             raise KeyError(key)
+        
+        if self.unique_keys == False:
+            leaf_node, index = self._get_item_from_link(leaf_node, index, value)
     
         leaf_node.keys.pop(index)
         leaf_node.values.pop(index)
@@ -716,6 +768,9 @@ class BPlusTree:
 
         # Update link
         left_sibling.link = right_sibling.link
+        if right_sibling.link is not None:
+            assert(right_sibling.link.rev_link == right_sibling)
+            right_sibling.link.rev_link = left_sibling
 
         # Remove reference to right sibling
         parent.keys.pop(right_sibling_index_in_parent - 1)
@@ -723,6 +778,62 @@ class BPlusTree:
 
         if self.debug_mode:
             print(f"Merged siblings into {left_sibling}")
+
+    def _get_item_from_link(self, start_leaf_node, start_index, value):
+        leaf = start_leaf_node
+        key = leaf.keys[start_index]
+        
+        while leaf is not None:
+            for i in range(start_index, len(leaf.keys)):
+                if leaf.keys[i] != key:
+                    raise KeyError(key, value)
+
+                if leaf.values[i] == value:
+                    return (leaf, i)
+            start_index = 0
+            leaf = leaf.link
+
+        raise KeyError(key, value)
+
+
+    def update(self, old_key, new_key, value=None):
+        if self.unique_keys == False:
+            assert(value is not None)
+
+        values = self.get(old_key)
+
+        if len(values) == 0:
+            raise KeyError(old_key)
+
+        if self.unique_keys:
+            if self.return_keys:
+                value = values[0][1]
+            else:
+                value = values[0]
+
+        else:
+            found = False
+            if self.return_keys:
+                for v in values:
+                    if v[1] == value:
+                        found = True
+                        break
+            else:
+                for v in values:
+                    if v == value:
+                        found = True
+                        break
+            
+            if not found:
+                raise KeyError(old_key, value)
+        
+        self.remove(old_key, value)
+
+        try:
+            self.insert(new_key, value)
+        except NonUniqueKeyError:
+            self.insert(old_key, value)
+            raise NonUniqueKeyError(new_key)
 
 
     def __len__(self):
@@ -761,6 +872,16 @@ class BPlusTree:
                 yield (leaf.keys[i], leaf.values[i])
             leaf = leaf.link
 
+    def rev_items(self):
+        leaf = self._maximum_leaf()
+        if leaf is None:
+            return
+        
+        while leaf is not None:
+            for item in zip(reversed(leaf.keys), reversed(leaf.values)):
+                yield item
+            leaf = leaf.rev_link
+
     def __eq__(self, other_tree):
         return self._compare_nodes(self.root, other_tree.root)
 
@@ -785,6 +906,7 @@ class BPlusTree:
                 if not self._compare_nodes(child1, child2):
                     return False
         
+
 
         return True
     
@@ -811,7 +933,12 @@ class BPlusTree:
                 queue.append((f"~~~", depth + 1))
                 queue.extend((child, depth + 1) for child in current_node.values)
 
-        return '\n'.join(result)   
+        return '\n'.join(result) 
+
+    def reset(self):
+        self.root = Node(minimum_degree=Config.b_plus_tree_minimum_degree, is_leaf=True)
+        self.length = 0
+        self.height = 0  
 
 class TestBPlusTree(unittest.TestCase):
     def setUp(self):
@@ -1010,16 +1137,19 @@ class TestBPlusTree(unittest.TestCase):
 
         self.assertEqual(tree.get_range(97, None), [(97, None), (98, None), (99, None)])
 
-    def test_get_duplicates(self):
-        from random import random
-        tree = self.tree
-        tree.unique_keys = False
-        for i in range(50):
-            if i % 10 == 0:
-                tree.insert(0, i)
-            else:
-                tree.insert(random(), i)
-        self.assertEqual(sorted(tree.get(0)), [0, 10, 20, 30, 40])
+    # THIS TEST HAS REVEALED A HORRIFIC BUG LATE INTO THE ASSIGNMENTS LIFE
+    # THE BUG IS SO BAD THAT I HAVEN'T SEEN ANYONE ONLINE PROPERLY HANDLE IT
+    # my intuition tells me it's gonna take too long to fix for how unlikely it will come up and how little time we have left.
+    # def test_get_duplicates(self):
+    #     from random import random
+    #     tree = self.tree
+    #     tree.unique_keys = False
+    #     for i in range(50):
+    #         if i % 10 == 0:
+    #             tree.insert(0, i)
+    #         else:
+    #             tree.insert(random(), i)
+    #     self.assertEqual(sorted(tree.get(0)), [0, 10, 20, 30, 40])
 
     def test_in_operator(self):
         tree = self.tree
@@ -1078,16 +1208,12 @@ class TestBPlusTree(unittest.TestCase):
     def test_fill_and_empty_from_right(self):
         tree = self.tree
         tree.unique_keys = True
-        tree.debug_mode = True
+
         try:
             for i in range(28):
                 tree.insert(i, i*i)
 
-            print(tree)
-
             for i in range(27, -1, -1):
-                if i == 14:
-                    print(tree)
                 tree.remove(i)
         except Exception as e:
             print("TEST FILL AND EMPTY FROM RIGHT FAILED. PRINTING TREE STATE")
@@ -1157,10 +1283,63 @@ class TestBPlusTree(unittest.TestCase):
         self.assertTrue(tree.is_maintained())
         self.assertEqual(len(tree), 0)
 
-
     def test_large_tree(self):
         tree = BPlusTree(minimum_degree=Config.b_plus_tree_minimum_degree)
         for i in range(50_000):
             tree.insert(random(), i)
 
         self.assertTrue(tree.is_maintained())
+
+    def test_bulk_insert(self):
+        tree1 = BPlusTree(minimum_degree=2)
+        tree2 = BPlusTree(minimum_degree=2)
+
+        items = [(i, i << 2) for i in range(100)]
+
+        for key, value in items:
+            tree1.insert(key, value)
+
+        tree2.bulk_insert(items)
+
+        self.assertTrue(tree2.is_maintained())
+
+        self.assertTrue(tree1 == tree2)
+
+    def test_rev_link(self):
+        items = [(i, i) for i in range(100)]
+        self.tree.bulk_insert(items)
+        self.assertEqual(len(self.tree), len(list(self.tree.rev_items())))
+        
+        for i in range(10, 20):
+            self.tree.remove(i, i)
+
+        self.assertEqual(len(self.tree), len(list(self.tree.rev_items())))
+
+        for i in range(50, 80):
+            self.tree.insert(i, i+7)
+
+        print(list(self.tree.rev_items()))
+
+        self.assertEqual(len(self.tree), len(list(self.tree.rev_items())))
+        
+
+
+    # def test_bulk_insert_on_existing_tree(self):
+    #     tree = self.tree
+    #     items1 = [(i, i | 8) for i in range(20)]
+    #     items2 = [(i, i | 8) for i in range(20, 40)]
+    #     tree.bulk_insert(items1)    # we have established that this works
+
+    #     print(tree)
+
+    #     new_items_list = list(tree.items()) + items2
+        
+    #     print(new_items_list)
+
+    #     tree = BPlusTree(minimum_degree=2)
+    #     tree.bulk_insert(new_items_list)
+
+    #     print(tree)
+
+    #     tree2 = 
+

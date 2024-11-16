@@ -1,20 +1,32 @@
+from errors import *
+
 class HashMap:
-    def __init__(self):
+    def __init__(self, unique_keys=True):
         self.map = {}
+        self.unique_keys = unique_keys
         self.length = 0
 
     def insert(self, key, value):
         self.length += 1
-        self.map[key] = value
+        if key not in self.map:
+            self.map[key] = []
+        elif self.unique_keys:
+            raise NonUniqueKeyError(key)
+
+        self.map[key].append(value)
+
+    def bulk_insert(self, items):
+        for key, value in items:
+            self.insert(key, value)
 
     def get(self, key):
-        return [self.map.get(key)] if key in self.map else []
+        return self.map.get(key) if key in self.map else []
     
     def get_range(self, low_key, high_key):
         values = []
         for key, value in self.map.items():
             if key >= low_key and key <= high_key:
-                values.append(value)
+                values.extend(value)
 
         return values
         
@@ -45,22 +57,60 @@ class HashMap:
         return self.length
     
     def keys(self):
-        return self.map.keys()
+        return iter(self.map.keys())
     
     def values(self):
-        return self.map.values()
+        return iter(self.map.values())
     
-    def remove(self, key):
-        if key in self.map:
-            del self.map[key]
-            self.length -= 1
-        # else:
-        #     # raise KeyError
-        #     print("Key Error")
+    def items(self):
+        # return iter(self.map.items())
+        items = self.map.items()
+        # Step 1: Flatten each tuple in first_list
+        items = [(key, value) for key, values in items for value in values]
+        return iter(items)
+
+    
+    def remove(self, key, value=None):
+        if key not in self.map:
+            raise KeyError(key)
         
-    def update(self, old_key, new_key):
-        value = self.get(old_key)
-        if type(value) == type([]):
-            value = value[0]
-        self.remove(old_key)
-        self.insert(new_key, value)
+        if not self.unique_keys:
+            assert(value is not None)
+            values = self.map[key]
+            values.remove(value)
+            if len(values) == 0:
+                del self.map[key]
+        else:
+            del self.map[key]
+
+        self.length -= 1
+
+        
+    def update(self, old_key, new_key, value=None):
+        if self.unique_keys == False:
+            assert(value is not None)
+
+        values = self.get(old_key)
+
+        if len(values) == 0:
+            raise KeyError(old_key)
+        
+        if self.unique_keys:
+            value = values[0]
+        else:
+            found = False
+            for v in values:
+                if v == value:
+                    found = True
+                    break
+
+            if not found:
+                raise KeyError(old_key, value)
+
+        self.remove(old_key, value)
+
+        try:
+            self.insert(new_key, value)
+        except NonUniqueKeyError:
+            self.insert(old_key, value)
+            raise NonUniqueKeyError(new_key)

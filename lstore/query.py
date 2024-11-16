@@ -13,6 +13,7 @@ from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
 import lstore.utils as utils
+from errors import *
 from config import Config
 import datetime
 
@@ -74,15 +75,6 @@ class Query:
         # for each column: if the last base page is at full capacity -> add a new base page
 
         # Verify that the primary key doesn't exist already
-        try:
-            pk = columns[self.table.primary_key]
-            pkv = self.table[pk]
-
-            # If the value is not null, it exists already
-            if (pkv is not None):
-                return False
-        except:
-            pass
 
         columns_values = [None] * (len(columns) + Config.column_data_offset)
 
@@ -97,9 +89,8 @@ class Query:
         columns_values[Config.column_data_offset:] = columns[:]
 
         try:
-            self.table.page_directory.add_record(columns_values)
             self.table.index.maintain_insert(columns, new_rid)
-    
+            self.table.page_directory.add_record(columns_values)
             return True
         except Exception as e:
             print(e)
@@ -200,16 +191,6 @@ class Query:
 
         found_rids = self.table.index.locate(column=self.table.primary_key, value=primary_key)
 
-        # In this case, the primary key itself is being updated, which requires extra checks
-        if (primary_key != columns[self.table.primary_key]):
-            other_rids = self.table.index.locate(column=self.table.primary_key, value=columns[self.table.primary_key])
-            
-            # Verify that changing the primary key does not result in an existing primary key
-            if (isinstance(other_rids, list)):
-                if (len(other_rids) > 0):
-                    if (other_rids[0] not in found_rids):
-                        return False
-
         relevant_rids = []
 
         for rid in found_rids:
@@ -222,6 +203,15 @@ class Query:
 
         # should be only one base rid
         assert len(relevant_rids) == 1
+
+        try:
+            self.table.index.maintain_update(primary_key, columns)
+        except NonUniqueKeyError:
+            return False
+        except KeyError:
+            return False
+        except Exception as e:
+            raise e
 
         columns_values = [-1] * (len(columns) + Config.column_data_offset)
 
@@ -281,7 +271,6 @@ class Query:
         )
         # assert self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, tail_flg=0) == columns_values[Config.schema_encoding_column_idx]
         
-        self.table.index.maintain_update(primary_key, columns)
         # assert len(self.table.index.locate(self.table.primary_key, primary_key)) == 1
         return True
 
