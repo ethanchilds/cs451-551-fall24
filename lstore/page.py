@@ -14,9 +14,13 @@ from config import Config
 from errors import PageNoCapacityError, PageValueTooLargeError, PageKeyError
 
 class Page:
-    def __init__(self, page_size=Config.page_size, cell_size=Config.page_cell_size):
+    def __init__(self, page_size=Config.page_size, cell_size=Config.page_cell_size, data=None):
         self.num_cells = 0
-        self.data = bytearray(page_size)
+        if (data is not None):
+            # Preallocated data
+            self.data = data
+        else:
+            self.data = bytearray(page_size)
         self.cell_size = cell_size
         self.page_id = id(self)
         self.index = 0
@@ -47,6 +51,7 @@ class Page:
         start_index = self.__locate(self.num_cells)
         end_index = start_index + self.cell_size
         # changed so that the value is converted to bytes before trying to write it
+        self.data = bytearray(self.data)
         self.data[start_index:end_index] = value.to_bytes(8, Config.byteorder, signed=True)
         self.num_cells += 1
 
@@ -54,6 +59,7 @@ class Page:
         start_index = self.__locate(rid)
         end_index = start_index + self.cell_size
         # changed so that the value is converted to bytes before trying to write it
+        self.data = bytearray(self.data)
         self.data[start_index:end_index] = value.to_bytes(8, Config.byteorder, signed=True)
 
     def read(self, cell_number: int) -> bytes:
