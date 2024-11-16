@@ -5,6 +5,7 @@ import os
 from config import Config
 from lstore.block import Block
 from lstore.table import Page
+from lstore.cache_policy import LeakyBucketCachePolicy, LRUCachePolicy, MRUCachePolicy
 from data_structures.priority_queue import PriorityQueue
 
 """
@@ -61,6 +62,8 @@ class BufferPool():
         
         # Create a priority queue corresponding to each Block
         self.queue = PriorityQueue(max_blocks)
+        policy = LRUCachePolicy(self.queue)
+        self.queue.set_policy(policy=policy)
 
         # Create a list of pins and dirty blocks
         # self.pinned_blocks

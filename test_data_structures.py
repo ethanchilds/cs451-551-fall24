@@ -222,6 +222,7 @@ from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
 
+
 # COMPARING INSERT VS BULK INSERT (min degree 128) (items already sorted)
 # size          insert time     bulk insert time    speed up
 # 100_000       0.2744          0.0277              9.9061
@@ -295,11 +296,23 @@ benchmark_inserts(bulk=True, mix_items=True)
 
 exit()
 
+# COMPARING INSERT VS BULK INSERT (min degree 128)
+# size          insert time     bulk insert time    difference
+# 100_000       0.2744          0.0259              10.594
+# 500_000       1.5082          0.1573              9.588
+# 1_000_000     3.0603          0.2500              12.241
+# 5_000_000     16.7839         1.3660              12.286
+# 10_000_000    35.8649         3.3714              10.637
+# 50_000_000    203.3555        it never finishes for some reason
+
+
 @timer
 def build_tree_by_one_at_a_time_insert(minimum_degree, size, items):
     tree = BPlusTree(minimum_degree)
     for key, value in items:
         tree.insert(key, value)
+
+    return tree
 
     return tree
 
@@ -312,6 +325,7 @@ def build_tree_by_batch_insert(minimum_degree, size, items):
     return tree
 
 minimum_degree = 128
+
 size = 5_000_000
 items = [(i, i ^ 63) for i in range(size)]
 shuffle(items)
@@ -324,6 +338,19 @@ tree_batch_insert = build_tree_by_batch_insert(minimum_degree, size, items)
 # tree_batch_insert.is_maintained()
 
 print(f"\nBoth trees are equivelant: {tree_batch_insert == tree_insert}")
+
+size = 1_000_000
+
+tree_insert = fn1(minimum_degree, size)
+items = [(i, i+i) for i in range(size)]
+print("starting fn2")
+tree_batch_insert = fn2(minimum_degree, size, items)
+
+# tree_batch_insert._maximum_leaf().values[0] = "AWOOOOOGAAA"
+# tree_batch_insert.root.values[1].values[-1].keys[-1] += 1
+tree_batch_insert.is_maintained()
+
+print(tree_insert == tree_batch_insert)
 
 # b = []
 # limit = size - (minimum_degree * 2)
