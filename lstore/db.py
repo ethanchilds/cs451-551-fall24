@@ -9,6 +9,7 @@ drops the specified table
 
 # System imports
 import os
+import pickle
 import lzma
 
 # Local imports
@@ -57,14 +58,16 @@ class Database():
         
         # Only close out if the stored path is proper
         if (self.path != ''):
-            for k,t in self.tables.items():
+            for table_name,t in self.tables.items():
                 # Create a folder for each table
-                pname = os.path.join(self.path, k)
+                    
+                pname = os.path.join(self.path, table_name)
                 if (not os.path.exists(pname)):
                     os.makedirs(pname)
                 
-                # TODO: Write all dirty pages
-                pass
+                #close table
+                t.close()
+            
 
     def create_table(self, name, num_columns, key_index):
         """Creates a new table
@@ -129,9 +132,16 @@ class Database():
             The table that was found in the current database
             or `None` if not found.
         """
-        if (name not in self.tables):
+        
+        table_path = os.path.exists(self.path + '/' + name)
+        
+        if (name not in self.tables) and not os.path.exists(table_path):
             raise TableDoesNotExistError(f"cannot get table `{name}` because it does not exist")
-
+        
+        if os.path.exists(table_path):
+            table = Table(self.path, name)
+            self.tables[name] = table
+            
         return self.tables.get(name)
     
 

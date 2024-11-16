@@ -44,7 +44,7 @@ class Block():
         ----------
         base_path : str
             The path to the base directory where the
-            data will be stored (<database>/<table>/<type>)
+            data will be stored (<database>/<table>/<type>/<column>)
         column : int
             The column number that this block corresponds to
         block_id : int
@@ -54,13 +54,13 @@ class Block():
         """
 
         self.base_path = base_path
-        self.column = column
+        # self.column = column
         self.block_id = block_id
         self.size = size
         self.pages = []  # A list of Page objects
 
         # Compute the full path
-        self.full_path = os.path.join(base_path, f"{0}.{1}.data".format(column, block_id))
+        self.full_path = os.path.join(base_path, f"{block_id}.data")
 
     def read(self):
         """Read data from disk if it exists.
@@ -208,3 +208,4 @@ class Block():
         """
 
         self.pages.append(p)
+        assert len(self.pages) <= self.size

@@ -28,7 +28,7 @@ class BufferPool():
     to be exchanged.
     """
 
-    def __init__(self, base_path, num_columns, max_blocks=Config.pool_max_blocks):
+    def __init__(self, base_path, num_columns, max_blocks=Config.pool_max_blocks, block_size = Config.pages_per_block):
         """Initialize the BufferPool
 
         Initialize the BufferPool with a set of
@@ -46,6 +46,8 @@ class BufferPool():
 
         # Create the base path if it doesn't exist
         self.base_path = base_path
+        self.max_blocks = max_blocks
+        self.block_size = block_size
         if (not os.path.exists(base_path + '/base')):
             os.makedirs(base_path + '/base')
             os.makedirs(base_path + '/tail')
@@ -98,43 +100,68 @@ class BufferPool():
         """
         return (old_value + 1)  # TODO: Abstract default policy
     
-    def add_page(self, page, column_id, tail_flg=0, cache_update=True):
-        pass
-        
+    def add_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
+        block_num = page_num // self.block_size
+        path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+        block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
+        block.read()
+        block.append(page)
+        self.dirty_blocks.append(block)
+        if cache_update:
+            key = (self.base_path, column_id, tail_flg, block_num)
+            value = block
+            self._maintain_cache(key, value)
+        else:
+            block.write()
 
-    def get_last_page(self, column_id, tail_flg=0, cache_update=True):
-        pass
-
-    def get_page(self, page_num, column_id, tail_flg=0, cache_update=True) -> Page:
-        """
-        Try to retrieve an item given a specific key.
-
-        Parameters
-        ----------
-        key : int
-            The key corresponding to a stored item
-        """
-
+    def get_page(self, page_num, column_id, tail_flg=0, cache_update=False) -> Page:
         # If the item is in the BufferPool, just return it
         # and apply the cache policy to the existing item
+        block_num = page_num // self.block_size
+        key = (self.base_path, column_id, tail_flg, block_num)
+        
         if (key in self.queue):
             # Extract the item and its current priority
-            item = self.queue.get(key)
-            old_priority = item[0]
+            block = self.queue.get(key)
+            # old_priority = item[0]
 
-            # Set the new priority according to the internal policy
-            new_priority = self.__policy__(old_priority)
-            self.queue.set_priority(key, new_priority)
+            # # Set the new priority according to the internal policy
+            # new_priority = self.__policy__(old_priority)
+            # self.queue.set_priority(key, new_priority)
 
-            # Return the item
-            return item
-
-        # If the item is not in the BufferPool, try to retrieve it from disk
-        #b = Block()
+            # # Return the item
+        else:
+            path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+            block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
+            block.read()
         
-    def mark_dirty_page(self, page_num, column_id, tail_flg=0, cache_update=True):
-        # if page_num = -1 then mark the last page dirty
-        pass
+        order_in_block = page_num % self.block_size
+        assert order_in_block < len(block.pages)
+        
+        page = block.pages[order_in_block]
+        if cache_update:
+            key = (self.base_path, column_id, tail_flg, block_num)
+            value = block
+            self._maintain_cache(key, value)
+        else:
+            block.write()
+        
+        return page
+        
+    def update_page(self, page, page_num, column_id, tail_flg=0, cache_update=False):
+        block_num = page_num // self.block_size
+        order_in_block = page_num % self.block_size
+        path = self.base_path + '/' + ('base' if tail_flg == 0 else 'tail') + '/' + str(column_id)
+        block = Block(path, column=column_id, block_id=block_num, size=self.block_size)
+        block.read()
+        block.pages[order_in_block] = page
+        if cache_update:
+            self.dirty_blocks.append(block)
+            key = (self.base_path, column_id, tail_flg, block_num)
+            value = block
+            self._maintain_cache(key, value)
+        else:
+            block.write()
 
 
 class CachePolicy():

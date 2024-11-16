@@ -40,6 +40,7 @@ class Page:
         start_index = self.__locate(self.num_cells)
         end_index = start_index + self.cell_size
         # changed so that the value is converted to bytes before trying to write it
+        self.data = bytearray(self.data)
         self.data[start_index:end_index] = value.to_bytes(8, Config.byteorder, signed=True)
         self.num_cells += 1
 
@@ -47,6 +48,7 @@ class Page:
         start_index = self.__locate(rid)
         end_index = start_index + self.cell_size
         # changed so that the value is converted to bytes before trying to write it
+        self.data = bytearray(self.data)
         self.data[start_index:end_index] = value.to_bytes(8, Config.byteorder, signed=True)
 
     def read(self, cell_number: int) -> bytes:
