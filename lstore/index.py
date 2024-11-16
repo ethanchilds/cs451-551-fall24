@@ -162,7 +162,8 @@ class Index:
         if self.indices[column] is not None:
             return
         
-        if self.usage_histogram[column][1] > 0:
+        if self.usage_histogram[column][1] > 0 or self.usage_histogram[column][0] > 0:
+            print("AUTOMATICALLY CREATING INDEX!!!")
             self.create_index(column, ordered=True)
     
     def _apply_maintenance(self, column):

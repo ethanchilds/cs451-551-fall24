@@ -296,6 +296,14 @@ class TestLstoreIndex(unittest.TestCase):
             self.query.insert(i, i, i, i)
 
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
+
+    def test_do_stuff_on_column_3(self):
+        self.index.automatic_new_indexes = True
+        for i in range(5):
+            self.query.insert(i, i, i, 2*i)
+
+        self.index.locate(column=3, value=4)
+        self.assertTrue(self.index.indices[3] is not None)
         
     
 if __name__ == '__main__':
