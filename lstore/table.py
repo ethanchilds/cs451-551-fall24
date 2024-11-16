@@ -15,7 +15,6 @@ from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsI
 from config import Config
 from lstore.pool import BufferPool
 import os
-import pickle
 import struct
 
 

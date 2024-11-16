@@ -9,7 +9,6 @@ drops the specified table
 
 # System imports
 import os
-import pickle
 import lzma
 
 # Local imports
