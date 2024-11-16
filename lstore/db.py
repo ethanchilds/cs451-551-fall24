@@ -65,7 +65,7 @@ class Database():
                 t.close()
 
 
-    def create_table(self, name, num_columns, key_index):
+    def create_table(self, name, num_columns, key_index, force_merge=True):
         """Creates a new table
 
         Parameters
@@ -90,7 +90,8 @@ class Database():
         if (name in self.tables):
             raise TableNotUniqueError
         
-        table = Table(self.path, name, num_columns, key_index)
+
+        table = Table(self.path, name, num_columns, key_index, force_merge)
         self.tables[name] = table
 
         return table

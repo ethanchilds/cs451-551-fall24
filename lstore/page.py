@@ -23,6 +23,17 @@ class Page:
             self.data = bytearray(page_size)
         self.cell_size = cell_size
         self.page_id = id(self)
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.index >= self.num_cells:
+            raise StopIteration
+        value = self.read(self.index)
+        self.index += 1
+        return value
 
     # Locate does not check if the cell_number is valid.
     def __locate(self, cell_number):

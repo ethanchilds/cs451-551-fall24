@@ -85,6 +85,7 @@ class Query:
         # get current timestamp as an integer
         columns_values[Config.timestamp_column_idx] = int(datetime.datetime.now().timestamp())
         columns_values[Config.indirection_column_idx] = -1
+        columns_values[Config.tps_and_brid_column_idx] = -1
         
         columns_values[Config.column_data_offset:] = columns[:]
 
@@ -217,7 +218,8 @@ class Query:
 
         # need base meta information
         rid = relevant_rids[0]
- 
+
+        base_rid = self.table.page_directory.get_column_value(rid, Config.rid_column_idx, tail_flg=0)
         base_ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx, tail_flg=0)
         base_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, tail_flg=0)
 
@@ -228,6 +230,7 @@ class Query:
         # get current timestamp as an integer
         columns_values[Config.timestamp_column_idx] = int(datetime.datetime.now().timestamp())
         columns_values[Config.indirection_column_idx] = base_ind
+        columns_values[Config.tps_and_brid_column_idx] = base_rid
 
         # code below maintains cumulative approach to tail records
 
