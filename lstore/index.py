@@ -44,6 +44,7 @@ class Index:
         """
         returns the location of all records with the given value on column "column"
         """
+        self._apply_maintenance(column)
         if column >= len(self.indices) or column < 0:
             raise ColumnDoesNotExist
         

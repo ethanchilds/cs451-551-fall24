@@ -7,22 +7,63 @@ name of the table, the number of columns, and the index of the key column. The d
 drops the specified table
 """
 
+# System imports
+import os
+import lzma
+
+# Local imports
 from lstore.table import Table
 from errors import TableNotUniqueError, TableDoesNotExistError
+from config import Config
 
 class Database():
     def __init__(self):
-        self.tables = {} # Dictionary of name - Table pairs
+        self.path = './TEMP'  # Path to the saved database
+        self.tables = {}  # Dictionary of name - Table pairs
 
-
-    # Not required for milestone1
     def open(self, path):
-        raise NotImplementedError
+        """Open an existing database
+        
+        Parameters
+        ----------
+        path : str
+            The path to the database file.  This will
+            be created if it doesn't already exist.
+        """
+
+        # Check if path is not empty
+        if (path != ''):
+            self.path = path
+
+            # Check if path already exists
+            if (not os.path.exists(path)):
+                # Create the folder
+                os.makedirs(path)
+        else:
+            pass # TODO: Throw an error for invalid path
     
 
     def close(self):
-        raise NotImplementedError
-    
+        """Close the current database
+
+        This manages all of the bookkeeping
+        methods that need to be called to
+        keep the current database persistent
+        on disk.
+        """
+        
+        # Only close out if the stored path is proper
+        if (self.path != ''):
+            for table_name,t in self.tables.items():
+                # Create a folder for each table
+                    
+                pname = os.path.join(self.path, table_name)
+                if (not os.path.exists(pname)):
+                    os.makedirs(pname)
+                
+                #close table
+                t.close()
+
 
     def create_table(self, name, num_columns, key_index):
         """Creates a new table
@@ -49,7 +90,7 @@ class Database():
         if (name in self.tables):
             raise TableNotUniqueError
         
-        table = Table(name, num_columns, key_index)
+        table = Table(self.path, name, num_columns, key_index)
         self.tables[name] = table
 
         return table
@@ -87,9 +128,16 @@ class Database():
             The table that was found in the current database
             or `None` if not found.
         """
-        if (name not in self.tables):
+        
+        table_path = os.path.exists(os.path.join(self.path, name))
+        
+        if (name not in self.tables) and not os.path.exists(table_path):
             raise TableDoesNotExistError(f"cannot get table `{name}` because it does not exist")
-
+        
+        if os.path.exists(table_path):
+            table = Table(self.path, name)
+            self.tables[name] = table
+            
         return self.tables.get(name)
     
 

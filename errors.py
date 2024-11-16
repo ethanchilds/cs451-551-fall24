@@ -147,3 +147,15 @@ class KeyError(BPlusTreeError):
             message = f"Key value pair ({key}, {value}) is not in the B+ Tee"
 
         super().__init__(message)
+
+"""PriorityQueue ERRORS"""
+class PriorityQueueCapacityOutOfBoundsError(Exception):
+    def __init__(self, capacity):
+        self.message = f"The given capacity {0} is out of bounds.".format(capacity)
+        super().__init__(self.message)
+
+class PriorityQueueInvalidPolicyError(Exception):
+    def __init__(self):
+        self.message = "The given policy is not a valid CachePolicy."
+        super().__init__(self.message)
+

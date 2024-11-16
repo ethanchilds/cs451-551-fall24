@@ -74,6 +74,17 @@ class Query:
 
         # for each column: if the last base page is at full capacity -> add a new base page
 
+        # Verify that the primary key doesn't exist already
+        try:
+            pk = columns[self.table.primary_key]
+            pkv = self.table[pk]
+
+            # If the value is not null, it exists already
+            if (pkv is not None):
+                return False
+        except:
+            pass
+
         columns_values = [None] * (len(columns) + Config.column_data_offset)
 
         new_rid = self.table.page_directory.num_records
@@ -89,9 +100,10 @@ class Query:
         try:
             self.table.page_directory.add_record(columns_values)
             self.table.index.maintain_insert(columns, new_rid)
-
+    
             return True
-        except:
+        except Exception as e:
+            print(e)
             return False
     
     """
@@ -188,7 +200,17 @@ class Query:
         #         found_rids.append(rid)
 
         found_rids = self.table.index.locate(column=self.table.primary_key, value=primary_key)
-        
+
+        # In this case, the primary key itself is being updated, which requires extra checks
+        if (primary_key != columns[self.table.primary_key]):
+            other_rids = self.table.index.locate(column=self.table.primary_key, value=columns[self.table.primary_key])
+            
+            # Verify that changing the primary key does not result in an existing primary key
+            if (isinstance(other_rids, list)):
+                if (len(other_rids) > 0):
+                    if (other_rids[0] not in found_rids):
+                        return False
+
         relevant_rids = []
 
         for rid in found_rids:
@@ -260,14 +282,6 @@ class Query:
             tail_flg=0
         )
         # assert self.table.page_directory.get_column_value(rid, Config.indirection_column_idx, tail_flg=0) == new_rid
-
-        self.table.page_directory.set_column_value(
-            rid,
-            Config.timestamp_column_idx,
-            new_value=columns_values[Config.timestamp_column_idx],
-            tail_flg=0
-        )
-        # assert self.table.page_directory.get_column_value(rid, Config.timestamp_column_idx, tail_flg=0) == columns_values[Config.timestamp_column_idx]
 
         self.table.page_directory.set_column_value(
             rid,
