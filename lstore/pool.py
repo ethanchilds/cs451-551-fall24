@@ -4,7 +4,7 @@ import os
 # Local imports
 from config import Config
 from lstore.block import Block
-from lstore.table import Page
+from lstore.page import Page
 from lstore.cache_policy import LeakyBucketCachePolicy, LRUCachePolicy, MRUCachePolicy
 from data_structures.priority_queue import PriorityQueue
 
@@ -29,7 +29,7 @@ class BufferPool():
     to be exchanged.
     """
 
-    def __init__(self, base_path, num_columns, max_blocks=Config.pool_max_blocks, block_size = Config.pages_per_block):
+    def __init__(self, base_path, num_columns, max_blocks=Config.pool_max_blocks, block_size = Config.pages_per_block, policy_class=LRUCachePolicy):
         """Initialize the BufferPool
 
         Initialize the BufferPool with a set of
@@ -62,7 +62,7 @@ class BufferPool():
         
         # Create a priority queue corresponding to each Block
         self.queue = PriorityQueue(max_blocks)
-        policy = LRUCachePolicy(self.queue)
+        policy = policy_class(self.queue)
         self.queue.set_policy(policy=policy)
 
         # Create a list of pins and dirty blocks
