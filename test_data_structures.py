@@ -242,18 +242,8 @@ from lstore.query import Query
 
 from lstore.index import TestIndexDataStructures
 # from lstore.index import TestIndex
-unittest.main()
+# unittest.main()
 
-hm = HashMap(unique_keys=False)
-hm.insert(3, 1)
-hm.insert(3, 2)
-hm.insert(3, 10)
-# hm.insert(1, -1)
-# hm.update(1, 3)
-hm.remove(3, 2)
-print(hm.get(3))
-
-exit()
 
 import time
 def tree_insert(tree, items):
@@ -264,7 +254,37 @@ def tree_bulk_insert(tree, items):
     tree.bulk_insert(items)
 
 
+def benchmark_start_from_zero(mix_items:bool):
+    total_items = 5_000_000
+    trials = 20
+
+    # for i in range(trials + 1):
+    i = 20
+    size = i * (total_items // trials) + 1
+
+    items = [(i, i) for i in range(size)]
+    if mix_items:
+        shuffle(items)
+
+    tree = BPlusTree(unique_keys=False)
+
+    start = time.time()
+    tree_bulk_insert(tree, items)
+    end = time.time()
+    duration = f"{end - start:.2f}"
+    print(duration)
+
+
+benchmark_start_from_zero(mix_items=False)
+exit()
+
 def benchmark_inserts(bulk: bool, mix_items: bool):
+    # CHANGE AROUND THE CONFIG.PY TO SWITCH INSERT MODES
+    # database = Database()
+    # table = database.create_table("Index Benchmark", 2, 0)
+    # query = Query(table)
+
+
     initial_size = 1_000_000
     trials = 20
 
