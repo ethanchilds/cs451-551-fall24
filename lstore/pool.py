@@ -4,7 +4,7 @@ import os
 # Local imports
 from config import Config
 from lstore.block import Block
-from lstore.table import Page
+from lstore.page import Page
 from lstore.cache_policy import LeakyBucketCachePolicy, LRUCachePolicy, MRUCachePolicy
 from data_structures.priority_queue import PriorityQueue
 
