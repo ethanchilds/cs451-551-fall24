@@ -10,7 +10,7 @@ class TestLstroreDB(unittest.TestCase):
 
     def setUp(self):
         self.db = Database()
-        self.test_table = self.db.create_table('Test', 5, 0)
+        self.test_table = self.db.create_table('Test', 5, 0, force_merge=True)
         self.query = Query(self.test_table)  
 
     def tearDown(self):

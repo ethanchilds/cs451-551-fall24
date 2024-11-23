@@ -1,5 +1,11 @@
 import subprocess
 
+
+# This code comes at the courtesy of ChatGPT and the following website
+# https://www.geeksforgeeks.org/how-to-count-number-of-lines-in-a-git-repository/
+# it is not included in the count of what code is ours
+
+
 def count_lines_of_code(included_paths=None):
     """
     Counts the total number of lines of code in a Git repository, filtered by specific folders or files.
