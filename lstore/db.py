@@ -9,7 +9,7 @@ drops the specified table
 
 # System imports
 import os
-import lzma
+import shutil
 
 # Local imports
 from lstore.table import Table
@@ -41,7 +41,6 @@ class Database():
                 os.makedirs(path)
         else:
             pass # TODO: Throw an error for invalid path
-    
 
     def close(self):
         """Close the current database
@@ -64,7 +63,6 @@ class Database():
                 #close table
                 t.close()
 
-
     def create_table(self, name, num_columns, key_index, force_merge=False):
         """Creates a new table
 
@@ -84,18 +82,21 @@ class Database():
 
         Raises
         ------
-        
+        TableNotUniqueError
         """
+
+        # Extract the table path on disk
+        table_path = os.path.join(self.path, name)
+
         # Check that the name doesn't exist already
-        if (name in self.tables):
+        if (name in self.tables or os.path.exists(table_path)):
             raise TableNotUniqueError
         
-
+        # Create a new table
         table = Table(self.path, name, num_columns, key_index, force_merge)
         self.tables[name] = table
 
         return table
-
     
     def drop_table(self, name):
         """Deletes the specified table
@@ -107,13 +108,21 @@ class Database():
         
         Raises
         ------
-        
+        TableDoesNotExistError
         """
-        if (name not in self.tables):
+
+        # Extract the table path on disk
+        table_path = os.path.join(self.path, name)
+
+        # Check if the table does not exist
+        if (name not in self.tables or not os.path.exists(table_path)):
             raise TableDoesNotExistError(f"cannot drop table `{name}` because it does not exist")
         
-        del self.tables[name]
+        # Delete the table on disk
+        shutil.rmtree(table_path, ignore_errors=True)
 
+        # Delete the table from memory
+        del self.tables[name]
     
     def get_table(self, name):
         """Returns table with the passed name
@@ -128,11 +137,15 @@ class Database():
         table : Table
             The table that was found in the current database
             or `None` if not found.
+
+        Raises
+        ------
+        TableDoesNotExistError
         """
         
-        table_path = os.path.exists(os.path.join(self.path, name))
-        
-        if (name not in self.tables) and not os.path.exists(table_path):
+        table_path = os.path.join(self.path, name)
+
+        if (name not in self.tables) and (not os.path.exists(table_path)):
             raise TableDoesNotExistError(f"cannot get table `{name}` because it does not exist")
         
         if os.path.exists(table_path):

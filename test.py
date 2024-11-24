@@ -1,12 +1,15 @@
-from lstore.db import Database
-from lstore.query import Query
+# System Imports
 import unittest
 import os
 import shutil
 import random
 
+# Local Imports
+from lstore.db import Database
+from lstore.query import Query
+import errors
 
-class TestLstroreDB(unittest.TestCase):
+class TestLstoreDB(unittest.TestCase):
 
     def setUp(self):
         self.db = Database()
@@ -228,6 +231,11 @@ class TestLstoreIndex(unittest.TestCase):
         self.table.index.create_index(1, ordered=True)
         self.table.index.create_index(2, ordered=False)
         self.query = Query(self.table)
+    
+    def tearDown(self):
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
 
     def test_insert_duplicate_pk(self):
         self.query.insert(0, 0, 0, 0)
@@ -334,7 +342,151 @@ class TestLstoreIndex(unittest.TestCase):
 #         print(self.query.select(12, 2, [True, False, True]))
         
         
+class TestLstoreDurability(unittest.TestCase):
+    """
+    Unit tests devoted to durability validation.
+    """
 
+    def setUp(self):
+        #self.db = Database()
+        self.db_path = './TEMP'
+    
+    def tearDown(self):
+        #self.db = None
+        #self.test_table = None
+        #self.query = None
+        if (os.path.exists(self.db_path)):
+            shutil.rmtree(self.db_path, ignore_errors=True)
+
+    def test_create_existing_table(self):
+        """
+        Try to create a table that already exists
+        on disk.
+        """
+
+        # Clear the database just in case
+        if (os.path.exists(self.db_path)):
+            shutil.rmtree(self.db_path, ignore_errors=True)
+
+        # Create a new database and table
+        db = Database()
+        db.open(self.db_path)
+        db.create_table('t1', 2, 0)
+
+        # Write the database
+        db.close()
+
+        # Try to open the database again
+        db = Database()
+        db.open(self.db_path)
+        with self.assertRaises(errors.TableNotUniqueError):
+            db.create_table('t1', 2, 0)
+
+        # Close the database
+        db.close()
+
+    def test_create_nonexisting_table(self):
+        """
+        Try to create a table that does not exist.
+        """
+
+        # Clear the database just in case
+        if (os.path.exists(self.db_path)):
+            shutil.rmtree(self.db_path, ignore_errors=True)
+
+        # Create a new database and table
+        db = Database()
+        db.open(self.db_path)
+        db.create_table('t1', 2, 0)
+
+        # Close the database
+        db.close()
+
+    def test_destroy_existing_table(self):
+        """
+        Try to destroy a table that already exists
+        on disk.
+        """
+
+        # Clear the database just in case
+        if (os.path.exists(self.db_path)):
+            shutil.rmtree(self.db_path, ignore_errors=True)
+
+        # Create a new database and table
+        db = Database()
+        db.open(self.db_path)
+        db.create_table('t1', 2, 0)
+
+        # Write the database
+        db.close()
+
+        # Open the database again
+        db = Database()
+        db.open(self.db_path)
+
+        # Verify that the table exists
+        t1 = db.get_table('t1')
+        self.assertTrue(t1 is not None)
+
+        # Drop the table
+        db.drop_table('t1')
+
+        # Close the database
+        db.close()
+
+        # Open the database again
+        db = Database()
+        db.open(self.db_path)
+
+        # Verify that the table does not exist
+        with self.assertRaises(errors.TableDoesNotExistError):
+            t1 = db.get_table('t1')
+        
+        # Close the database
+        db.close()
+
+    def test_destroy_nonexisting_table(self):
+        """
+        Try to destroy a table that does not exist.
+        """
+
+        # Clear the database just in case
+        if (os.path.exists(self.db_path)):
+            shutil.rmtree(self.db_path, ignore_errors=True)
+
+        # Create a new database and table
+        db = Database()
+        db.open(self.db_path)
+        db.create_table('t1', 2, 0)
+
+        # Write the database
+        db.close()
+
+        # Open the database again
+        db = Database()
+        db.open(self.db_path)
+
+        # Verify that the table exists
+        t1 = db.get_table('t1')
+        self.assertTrue(t1 is not None)
+
+        # Drop a non existing table
+        with self.assertRaises(errors.TableDoesNotExistError):
+            db.drop_table('t2')
+
+        # Close the database
+        db.close()
+
+        # Open the database again
+        db = Database()
+        db.open(self.db_path)
+
+        # Verify that the previous table still exists
+        t1 = db.get_table('t1')
+        self.assertTrue(t1 is not None)
+        
+        # Close the database
+        db.close()
     
 if __name__ == '__main__':
     unittest.main()
