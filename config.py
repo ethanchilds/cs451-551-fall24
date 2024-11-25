@@ -25,6 +25,10 @@ class Config:
     tps_and_brid_column_idx = 4
     benchmark_mode = False
 
+    # Lock types
+    SHARED_LOCK = 0
+    EXCLUSIVE_LOCK = 1
+
     # Best time to insert 100_000 random items into a b+ tree with minimum_degree.
     # 200 1.5865
     # 150 1.5878
