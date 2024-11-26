@@ -133,27 +133,28 @@ class Index:
                 else:
                     self.maintenance_list[column].append((value, rid))
 
-    def maintain_update(self, primary_key, new_columns):
-        rid = self.locate(column=self.table.primary_key, value=primary_key)[0]
+    def maintain_update(self, rid, new_columns):
+        """
+        rid is assumed to be valid
+        otherwise, undefined behavior!!!
+        """       
         for column, new_value in enumerate(new_columns):
             self._apply_maintenance(column)
             index = self.indices[column]
             if index and (new_value is not None):
                 old_value = self.table.page_directory.get_column_value(rid, column + Config.column_data_offset)
-                index.update(old_value, new_value)
+                index.update(old_value, new_value, rid)
     
-    def maintain_delete(self, primary_key):
-        rid = self.locate(column=self.table.primary_key, value=primary_key)[0]
-        if rid is None:
-            raise KeyError
-        
+    def maintain_delete(self, rid):
+        """
+        rid is assumed to be valid
+        otherwise, undefined behavior!!!
+        """
         for column, index in enumerate(self.indices):
             self._apply_maintenance(column)
             if index:
-                value = self.table.page_directory.get_column_value(rid, self.table.primary_key + Config.column_data_offset)
-                index.remove(value)
-
-        return
+                value = self.table.page_directory.get_column_value(rid, column + Config.column_data_offset)
+                index.remove(value, rid)
     
     def _consider_new_index(self, column):
         if self.automatic_new_indexes == False:
@@ -243,7 +244,7 @@ class TestIndexDataStructures(unittest.TestCase):
 
     def test_remove_duplicate_keys(self):
         self.make_duplicate_keys()
-        value1 = self.ordered.get(1)[1]
+        value1 = sorted(self.ordered.get(1))[1]
         value2 = sorted(self.unordered.get(1))[1]
         self.ordered.remove(1, value1)
         self.unordered.remove(1, value2)

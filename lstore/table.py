@@ -396,7 +396,7 @@ class Table:
 
         return self.__str__()
 
-    def column_iterator(self, column, tail_flg=0):
+    def column_iterator(self, column, tail_flg=1):
         """Iterate through all values in a column
 
         Parameters
@@ -423,11 +423,19 @@ class Table:
         for i in range(len(self)):
             # Resolve the true RID
             rid_column = Config.rid_column_idx
-            rid = self.page_directory.get_column_value(rid=i, column_id=rid_column, tail_flg=tail_flg)
-            
+            indirection_column = Config.indirection_column_idx
+            rid = self.page_directory.get_column_value(rid=i, column_id=rid_column, tail_flg=0)
+            if rid == -1:
+                # if a tombstone is found, continue
+                continue
+
+            indirection = self.page_directory.get_column_value(rid=i, column_id=indirection_column, tail_flg=0)
+
             # Only yield if RID is valid
-            if (rid != -1):
-                yield rid, self.page_directory.get_column_value(rid, column+Config.column_data_offset, tail_flg)
+            if (indirection != -1):
+                yield rid, self.page_directory.get_column_value(indirection, column+Config.column_data_offset, tail_flg=1)
+            else:
+                yield rid, self.page_directory.get_column_value(rid, column+Config.column_data_offset, tail_flg=0)
         
     def get_column(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
@@ -447,7 +455,6 @@ class Table:
         status : bool
             Whether or not the operation completed successfully
         """
-
         # Set the RID column value to -1 (invalid)
         self.page_directory.set_column_value(rid, Config.rid_column_idx, -1, 0)
         

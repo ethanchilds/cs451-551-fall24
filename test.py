@@ -1,5 +1,6 @@
 from lstore.db import Database
 from lstore.query import Query
+from config import Config
 import unittest
 import os
 import shutil
@@ -277,7 +278,6 @@ class TestLstoreIndex(unittest.TestCase):
         len1 = len(self.index.locate(1, 8))
         len2 = len(self.index.locate(2, 8))
 
-        # KNOWN BUG WITH B+TREE!!! THIS TEST FAILS!!!
         self.assertEqual(len1, num_items)
         self.assertEqual(len1, len2)
 
@@ -303,37 +303,62 @@ class TestLstoreIndex(unittest.TestCase):
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
         
 # from random import shuffle
-# class UltimateLstoreTest(unittest.TestCase):
-#     """
-#     This is the ultimate lstore test
-#     Every query
-#     Every column
-#     Every order
-#     """
-#     def setUp(self):
-#         self.database = Database()
-#         self.table = self.database.create_table("Test Table", 3, 0)
-#         self.query = Query(self.table)
+class UltimateLstoreTest(unittest.TestCase):
+    """
+    This is the ultimate lstore test
+    Every query
+    Every column
+    Every order
+    """
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.create_table("Test Table", 3, 0)
+        self.query = Query(self.table)
 
-#     def test_everything_all_at_once(self):
-#         queries = []
-#         for i in range(100_000):
-#             if i < 90_000:
-#                 queries.append((i, -i, 2*i))
-#             else:
-#                 queries.append((i, i % 31, i % 727))
+    def tearDown(self):
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
 
-#         queries += queries
-#         print("done making items")
+    def test_insert_update_select(self):
+        new_val = [1, 2, 3]
+        self.assertTrue(self.query.insert(0, 0, 0))
+        self.assertTrue(self.query.update(0, *new_val))
+
+        for i, v in enumerate(new_val):
+            result = self.query.select(v, i, [True, True, True])
+            if (len(result) > 0):
+                print("Thumbs up")
+            else:
+                print("Thumbs down :(")
+
+    def test_everything_all_at_once(self):
+        tuples = []
+        for i in range(10_000):
+            if i < 9_000:
+                tuples.append((i, -i, 2*i))
+            else:
+                tuples.append((i, i % 31, i % 10))
+
+        random.shuffle(tuples)
+        for t in tuples:
+            self.assertTrue(self.query.insert(*t))
+
+        random.shuffle(tuples)
+        for i in range(5):
+            self.assertFalse(self.query.insert(*t))
+
         
-#         for q in queries:
-#             self.query.insert(*q)
+        self.assertFalse(self.query.update(1_000_000, *[999_999, 10, 20])) # no tuple has pk == 1
+        self.assertFalse(self.query.update(0, *[1, 10, 20])) # the pk: 1 is already in use
+        self.assertTrue(self.query.update(0, *[1_000_000, 999_999, 999_999])) # the pk: 0 is valid and the pk: -1 is free to use
 
-#         print("done inserting queries")
+        self.assertEqual(self.query.select(0, 0, [True, True, True]), []) # shouldn't be a row anymore
+        print(self.query.select(999_999, 2, [True, True, True])[0].info_print())
+        print(sorted(list(self.table.column_iterator(2)), key=lambda item: item[1])[-1])
 
-#         print(self.query.select(12, 2, [True, False, True]))
-        
-        
+        self.assertEqual(self.query.sum(0, 10_000, 0), 49_995_000) # computed from f(n) = (n*(n+1))/2
+                  
 
     
 if __name__ == '__main__':
