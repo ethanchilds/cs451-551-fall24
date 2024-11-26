@@ -1,6 +1,6 @@
 from lstore.table import Table, Record
 from lstore.index import Index
-from lstore.threading import ThreadedQuery
+from lstore.wrapper import QueryWrapper
 
 class Transaction:
 
@@ -9,7 +9,8 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
-        self.locks = []  # A list of granted locks
+        self.log = []  # Log of each query in the order they were done
+        self.lock_managers = set()
 
     def add_query(self, query, table, *args):
         """
@@ -32,7 +33,12 @@ class Transaction:
             t.add_query(q.update, grades_table, 0, *[None, 1, None, 2, None])
         """
 
+        # Add the query to the query list
         self.queries.append((query, table, args))
+
+        # Add the lock manager to the lock manager set
+        self.lock_managers.add(table.lock_manager)
+
         # use grades_table for aborting
         
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
@@ -49,25 +55,47 @@ class Transaction:
         """
 
         for query, table, args in self.queries:
-            # Wrap the query in a ThreadedQuery wrapper
-            query_wrapper = ThreadedQuery(query, table)
+            # Wrap the query in a QueryWrapper wrapper
+            query_wrapper = QueryWrapper(query, table)
             result = query_wrapper.try_run(*args)
             
             # If the query has failed the transaction should abort
             if result == False:
+                # The lock failed to be obtained
                 return self.abort()
+            elif result == None:
+                # An actual error occurred in the transaction
+                return self.abort(failure=True)
+        
         return self.commit()
-
     
-    def abort(self):
+    def abort(self, failure=False):
         """
         Roll back any operations that were applied
         and abort the transaction, releasing any locks
         that were granted.
+
+        Parameters
+        ----------
+        failure : bool (default=False)
+            Whether or not an actual error occurred
+
+        Returns
+        -------
+        status : False or None
+            If the transaction aborted due to a lock issue
+            this returns False, if there was an actual error
+            then it returns None to signal that this transaction
+            is actually invalid.
         """
 
         #TODO: do roll-back and any other necessary operations
-        return False
+
+
+        # Release all held locks
+        self.__release_all()
+
+        return (False if not failure else None)
 
     
     def commit(self):
@@ -77,5 +105,23 @@ class Transaction:
         """
 
         # TODO: commit to database
+
+
+        # Release all held locks
+        self.__release_all()
+        
         return True
 
+
+    def __release_all(self):
+        """Internal lock release
+
+        Release all internally held locks.
+        """
+
+        # Loop through all lock managers
+        for manager in self.lock_managers:
+            manager.release_all(self)
+
+        # Clear the lock managers
+        self.lock_managers.clear()
