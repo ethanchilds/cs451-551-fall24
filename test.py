@@ -212,6 +212,48 @@ class TestLstoreDB(unittest.TestCase):
 
         self.assertTrue(passed)
 
+
+class UltimateLstoreTest(unittest.TestCase):
+    """
+    This is the ultimate lstore test
+    Every query
+    Every column
+    Every order
+    """
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.create_table("Test Table", 3, 0)
+        self.query = Query(self.table)
+
+    def test_everything_all_at_once(self):
+        tuples = []
+        for i in range(10_000):
+            if i < 9_000:
+                tuples.append((i, -i, 2*i))
+            else:
+                tuples.append((i, i % 31, i % 10))
+
+        random.shuffle(tuples)
+        for t in tuples:
+            self.assertTrue(self.query.insert(*t))
+
+        random.shuffle(tuples)
+        for i in range(5):
+            self.assertFalse(self.query.insert(*t))
+
+        
+        self.assertFalse(self.query.update(1_000_000, *[999_999, 10, 20])) # no tuple has pk == 1
+        self.assertFalse(self.query.update(0, *[1, 10, 20])) # the pk: 1 is already in use
+        self.assertTrue(self.query.update(0, *[1_000_000, 999_999, 999_999])) # the pk: 0 is valid and the pk: -1 is free to use
+
+        self.assertEqual(self.query.select(0, 0, [True, True, True]), []) # shouldn't be a row anymore
+        
+        result = self.query.select(999_999, 2, [True, True, True])
+        self.assertEqual(len(result), 1)
+        # print(sorted(list(self.table.column_iterator(2, tail_flg=True)), key=lambda item: item[1])[-1])
+
+        self.assertEqual(self.query.sum(0, 10_000, 0), 49_995_000) # computed from f(n) = (n*(n+1))/2
+
 class TestLstoreIndex(unittest.TestCase):
     """
     THE BEHAVIOR OF THE INDEX
