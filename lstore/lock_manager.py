@@ -27,9 +27,9 @@ class LockManager():
         self.x_locks = {}  # Exclusive locks which map a key to a single Transaction
         self.s_locks = {}  # Shared locks which map a key to a set of Transactions
         self.transaction_dictionary = {}  # Transactions mapped to a set of x/s lock keys
-        self.lock = threading.Lock()  # Internal mutex (Singular to prevent request/release race conditions)
+        self.__lock = threading.Lock()  # Internal mutex (Singular to prevent request/release race conditions)
 
-    def _add_transaction(self, key, transaction):
+    def __add_transaction(self, key, transaction):
         """Internal method to add transactions
 
         This maintainings the transaction dictionary when
@@ -51,7 +51,7 @@ class LockManager():
         # Add the key to the transaction's set
         self.transaction_dictionary[transaction].add(key)
 
-    def _remove_transaction(self, key, transaction):
+    def __remove_transaction(self, key, transaction):
         """Internal method to remove transactions
 
         This maintainings the transaction dictionary when
@@ -76,7 +76,7 @@ class LockManager():
                 if (len(t_set) == 0):
                     del self.transaction_dictionary[transaction]
 
-    def _add_shared_lock(self, key, transaction):
+    def __add_shared_lock(self, key, transaction):
         """Internal method for adding shared lock
 
         Add a shared lock to the internal storage.
@@ -102,11 +102,11 @@ class LockManager():
         self.s_locks[key].add(transaction)
 
         # Maintain the transaction dictionary
-        self._add_transaction(key, transaction)
+        self.__add_transaction(key, transaction)
 
         return True
 
-    def _remove_shared_lock(self, key, transaction):
+    def __remove_shared_lock(self, key, transaction):
         """Internal method for removing shared lock
 
         Remove a shared lock from the internal storage.
@@ -138,7 +138,7 @@ class LockManager():
                     del self.s_locks[key]
 
                 # Maintain the transaction dictionary
-                self._remove_transaction(key, transaction)
+                self.__remove_transaction(key, transaction)
 
                 return True
             else:
@@ -148,7 +148,7 @@ class LockManager():
             # The key does not exist
             return False
 
-    def _add_exclusive_lock(self, key, transaction):
+    def __add_exclusive_lock(self, key, transaction):
         """Internal method for adding exclusive lock
 
         Add an exclusive lock to the internal storage.
@@ -171,13 +171,13 @@ class LockManager():
             self.x_locks[key] = transaction
 
             # Maintain the transaction dictionary
-            self._add_transaction(key, transaction)
+            self.__add_transaction(key, transaction)
 
             return True
         else:
             return False
 
-    def _remove_exclusive_lock(self, key, transaction):
+    def __remove_exclusive_lock(self, key, transaction):
         """Internal method for removing exclusive lock
 
         Remove an exclusive lock from the internal storage.
@@ -202,7 +202,7 @@ class LockManager():
                 del self.x_locks[key]
 
                 # Maintain the transaction dictionary
-                self._remove_transaction(key, transaction)
+                self.__remove_transaction(key, transaction)
 
                 return True
             else:
@@ -238,7 +238,7 @@ class LockManager():
             The key for the lock, or None if unsuccessful
         """
 
-        with self.lock:
+        with self.__lock:
             # Construct keys for different lock types
             s_key = (Config.SHARED_LOCK, unique_id)
             x_key = (Config.EXCLUSIVE_LOCK, unique_id)
@@ -265,8 +265,8 @@ class LockManager():
                     # The lock can be upgraded to an X-Lock if it belongs to the requesting Transaction
                     if (transaction in self.s_locks[s_key]):
                         # Upgrade the lock
-                        self._remove_shared_lock(s_key, transaction)
-                        self._add_exclusive_lock(lock_key, transaction)
+                        self.__remove_shared_lock(s_key, transaction)
+                        self.__add_exclusive_lock(lock_key, transaction)
 
                         return lock_key
                     else:
@@ -274,11 +274,11 @@ class LockManager():
                         return None
                 else:
                     # The exclusive lock can be added
-                    self._add_exclusive_lock(lock_key, transaction)
+                    self.__add_exclusive_lock(lock_key, transaction)
                     return lock_key
             elif (lock_type == Config.SHARED_LOCK):
                 # The shared lock can be added since no exclusive locks precede it
-                self._add_shared_lock(lock_key, transaction)
+                self.__add_shared_lock(lock_key, transaction)
                 return lock_key
             else:
                 # Unhandled lock type
@@ -312,7 +312,7 @@ class LockManager():
             otherwise returns False.
         """
 
-        with self.lock:
+        with self.__lock:
             # Try to successfully release a lock
             try:
                 # Construct the lock key
@@ -320,12 +320,12 @@ class LockManager():
 
                 # If releasing exclusive lock, deconstruct it
                 if (lock_type == Config.EXCLUSIVE_LOCK):
-                    return self._remove_exclusive_lock(lock_key, transaction)
+                    return self.__remove_exclusive_lock(lock_key, transaction)
                 
                 # If releasing shared lock, decrement count if other
                 # threads are using it, else deconstruct it
                 elif (lock_type == Config.SHARED_LOCK):
-                    return self._remove_shared_lock(lock_key, transaction)
+                    return self.__remove_shared_lock(lock_key, transaction)
                 else:
                     # Unhandled lock type
                     return False
@@ -349,16 +349,16 @@ class LockManager():
             Whether or not the operation completed successfully
         """
 
-        with self.lock:
+        with self.__lock:
             # Loop through all keys in the transaction dictionary for the given transaction
             for key in self.transaction_dictionary[transaction]:
                 # Check the lock type
                 if (key[0] == Config.SHARED_LOCK):
-                    status = self._remove_shared_lock(key, transaction)
+                    status = self.__remove_shared_lock(key, transaction)
                     if (status == False):
                         return False
                 elif (key[0] == Config.EXCLUSIVE_LOCK):
-                    status = self._remove_exclusive_lock(key, transaction)
+                    status = self.__remove_exclusive_lock(key, transaction)
                     if (status == False):
                         return False
             
