@@ -7,20 +7,23 @@ given a RID, returns the actual physical location of the record. The table class
 the periodical merge of its corresponding page ranges.
 """
 
-
-from lstore.index import Index
-import lstore.utils as utils
+# System Imports
 import copy
+import math
+import os
+import struct
+import threading
 import time
-from lstore.page import Page
-from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsInvalidError
+
+# Local Imports
 from config import Config
 from data_structures.queue import Queue
-import threading
+from errors import ColumnDoesNotExist, PrimaryKeyOutOfBoundsError, TotalColumnsInvalidError
+from lstore.index import Index
+from lstore.lock_manager import LockManager
+from lstore.page import Page
 from lstore.pool import BufferPool
-import os
-import math
-import struct
+import lstore.utils as utils
 
 
 class Record:
@@ -234,6 +237,7 @@ class Table:
         self.name = name
         self.primary_key = primary_key
         self.num_columns = num_columns
+        self.lock_manager = LockManager()
         
         # restore num_records and num_tail_records if they exist
         meta_path = os.path.join(db_path, name, 'meta.data')
