@@ -28,77 +28,67 @@ class Index:
         self.OrderedDataStructure = BPlusTree
         self.UnorderedDataStructure = HashMap
         self.usage_histogram = [[0 for i in range(2)] for j in range(table.num_columns)] # 0: point queries, 1: range queries
-        self.maintenance_list = [[] for _ in range(table.num_columns)]
         self.table = table
         self.benchmark_mode = benchmark_mode
         self.debug_mode = debug_mode
         self.automatic_new_indexes = automatic_new_indexes
         self.has_unique_keys = [False] * table.num_columns
 
-        # Always make an ordered index on the primary key with unique_keys
-        self.has_unique_keys[table.primary_key] = True
-        self.create_index(column_number=table.primary_key, unique_keys=True, ordered=True)
+        # Default unique key index on the primary key.
+        self.create_index(column=table.primary_key, unique_keys=True, ordered=True)
         
 
     def locate(self, column: int, value):
         """
         returns the location of all records with the given value on column "column"
         """
-        self._apply_maintenance(column)
         if column >= len(self.indices) or column < 0:
             raise ColumnDoesNotExist
         
-        self.usage_histogram[column][0] += 1
-        
-        self._apply_maintenance(column)
+        self.usage_histogram[column][POINT_QUERY] += 1
         self._consider_new_index(column)
 
         if self.indices[column]:
-            index = self.indices[column]
-            return index.get(value)
+            return self.indices[column].get(value)
         else:
             return list(self._locate_linear(column, target_value=value))
 
 
     def locate_range(self, begin, end, column):
         """
-        Returns the RIDs of all records with values in column "column" between "begin" and "end"
-        
+        Returns the RIDs of all records with values in column "column" between "begin" and "end"       
         returns list of (value, rid) pairs
         """
         if column >= len(self.indices) or column < 0:
             raise ColumnDoesNotExist
         
-        self.usage_histogram[column][1] += 1
-
-        self._apply_maintenance(column)
+        self.usage_histogram[column][RANGE_QUERY] += 1
         self._consider_new_index(column)
 
         if self.indices[column]:
-            index = self.indices[column]
-            return index.get_range(begin, end)
+            return self.indices[column].get_range(begin, end)
         else:
             return list(self._locate_range_linear(column, low_target_value=begin, high_target_value=end))
 
     @timer
-    def create_index(self, column_number, ordered:bool=False, unique_keys:bool=False):
+    def create_index(self, column, ordered:bool=False, unique_keys:bool=False):
         """
         Create index on specific column
         """
-        if self.indices[column_number]:
-            raise ValueError("Index at column ", column_number, " already exists")
+        if self.indices[column]:
+            raise ValueError("Index at column ", column, " already exists")
         
+        self.has_unique_keys[column] = unique_keys
 
-        self.has_unique_keys[column_number] = unique_keys
-        data_structure = self.OrderedDataStructure(unique_keys=unique_keys) if ordered else self.UnorderedDataStructure(unique_keys=unique_keys)
+        if ordered:
+            data_structure = self.OrderedDataStructure(unique_keys=unique_keys)
+        else:
+            data_structure = self.UnorderedDataStructure(unique_keys=unique_keys)
 
-        self.indices[column_number] = data_structure
+        self.indices[column] = data_structure
 
-        items = list(self.table.column_iterator(column_number))
-        items.sort(key=lambda item: item[0])
-    
-        for rid, value in items:
-            data_structure.insert(value, rid)
+        items = list(self.table.column_iterator(column))
+        data_structure.bulk_insert(items)
 
     def drop_index(self, column_number):
         """
@@ -111,8 +101,8 @@ class Index:
         Returns the rid of every row with target_value in a column
         A linear scan point query
         """
-        for rid, value in self.table.column_iterator(column):
-            if value == target_value:
+        for attribute, rid in self.table.column_iterator(column):
+            if attribute == target_value:
                 yield rid
 
     def _locate_range_linear(self, column, low_target_value, high_target_value):
@@ -120,30 +110,29 @@ class Index:
         Returns the rid of every row with a value within range in a column
         A linear scan range query
         """
-        for rid, value in self.table.column_iterator(column):
-            if (not low_target_value or value >= low_target_value) and (not high_target_value or value <= high_target_value):
+        for attribute, rid in self.table.column_iterator(column):
+            if (not low_target_value or attribute >= low_target_value) and (not high_target_value or attribute <= high_target_value):
                 yield rid
     
-    def maintain_insert(self, columns, rid):
-        for column, value in enumerate(columns):
-            if self.indices[column] is not None:
-                # HYBRID MAINTINANCE!!! (becuase lazy manintinance doesn't work if the value has to be unique)
-                if self.has_unique_keys[column] == True:
-                    self.indices[column].insert(value, rid)
-                else:
-                    self.maintenance_list[column].append((value, rid))
+    def maintain_insert(self, tuple, rid):
+        for column, attribute in enumerate(tuple):
+            if self.indices[column] is None:
+                continue
 
-    def maintain_update(self, rid, new_columns):
+            self.indices[column].insert(attribute, rid)
+
+    def maintain_update(self, rid, new_tuple):
         """
         rid is assumed to be valid
         otherwise, undefined behavior!!!
         """       
-        for column, new_value in enumerate(new_columns):
-            self._apply_maintenance(column)
+        for column, new_attribute in enumerate(new_tuple):
             index = self.indices[column]
-            if index and (new_value is not None):
-                old_value = self.table.page_directory.get_column_value(rid, column + Config.column_data_offset)
-                index.update(old_value, new_value, rid)
+            if (index is None) or (new_attribute is None):
+                continue
+
+            old_attribute = self.table.page_directory.get_data_attribute(rid, column)
+            index.update(old_attribute, new_attribute, rid)
     
     def maintain_delete(self, rid):
         """
@@ -151,10 +140,9 @@ class Index:
         otherwise, undefined behavior!!!
         """
         for column, index in enumerate(self.indices):
-            self._apply_maintenance(column)
             if index:
-                value = self.table.page_directory.get_column_value(rid, column + Config.column_data_offset)
-                index.remove(value, rid)
+                attribute = self.table.page_directory.get_data_attribute(rid, column)
+                index.remove(attribute, rid)
     
     def _consider_new_index(self, column):
         if self.automatic_new_indexes == False:
@@ -163,19 +151,9 @@ class Index:
         if self.indices[column] is not None:
             return
         
-        if self.usage_histogram[column][1] >= 2 or self.usage_histogram[column][0] >= 2:
+        if self.usage_histogram[column][RANGE_QUERY] >= 2 or self.usage_histogram[column][POINT_QUERY] >= 2:
+            print(f"AUTOMATICALLY CREATING INDEX ON COLUMN {column}")
             self.create_index(column, ordered=True, unique_keys=False)
-    
-    def _apply_maintenance(self, column):
-        if self.indices[column] is not None and self.has_unique_keys[column] == False:
-            if len(self.maintenance_list[column]) > 0:
-                
-                if self.debug_mode:
-                    print(f"INDEX {column} IS APPLYING MAINTENANCE")
-
-                self.indices[column].bulk_insert(self.maintenance_list[column])
-
-                self.maintenance_list[column] = []
 
 import unittest
 from random import shuffle
@@ -232,7 +210,10 @@ class TestIndexDataStructures(unittest.TestCase):
             self.unordered.insert(0, 10)
 
     def test_items(self):
-        self.assertEqual(list(self.ordered.items()), list(self.unordered.items()))
+        ordered_items = list(self.ordered.items())
+        unordered_items = list(self.unordered.items())
+        unordered_items.sort(key=lambda item: item[0])
+        self.assertEqual(ordered_items, unordered_items)
 
     def test_remove(self):
         self.ordered.remove(1)
@@ -372,8 +353,6 @@ locate range method: low_key, high_key, column -> list of rid's; applies mainten
 maintain_insert: doesn't apply immediately. Except pk. That needs to go in immediately (because it has to be unique)
 maintain_update: applies maintinance. new pk can't exist
 maintain_delete: applies maintinance. 
-_apply_maintainance: loops through maintenance lists and bulk inserts. Can't do on pk.
-    
 """
 
     

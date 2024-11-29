@@ -7,6 +7,11 @@ from random import *
 
 import unittest
 from test import UltimateLstoreTest
+from lstore.index import TestIndexDataStructures
+from test import UltimateLstoreTest
+from lstore.table import Table
+
+
 unittest.main()
 
 

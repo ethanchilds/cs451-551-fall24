@@ -301,7 +301,8 @@ class TestLstoreIndex(unittest.TestCase):
             self.query.insert(i, i, i, i)
 
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
-        
+
+import time
 # from random import shuffle
 class UltimateLstoreTest(unittest.TestCase):
     """
@@ -320,6 +321,38 @@ class UltimateLstoreTest(unittest.TestCase):
         if (os.path.exists(db_path)):
             shutil.rmtree(db_path, ignore_errors=True)
 
+    def test_automatic_index(self):
+        for i in range(10):
+            self.query.insert(i, i % 3, i % 4)
+
+        result1 = self.query.select(1, 1, [True, True, True])
+        result2 = self.query.select(1, 1, [True, True, True])
+        result3 = self.query.select(4, 1, [True, True, True])
+        self.query.sum(1, 1, 2)
+        self.query.sum(0, 0, 2)
+        self.query.sum(0, 5, 2)
+        # self.query.select(2, 2, [False, True, False])
+        # self.query.select(1, 2, [False, True, False])
+
+    def test_update_a_lot(self):
+        self.assertTrue(self.query.insert(0, 10, 20))
+        self.assertTrue(self.query.insert(5, 0, 5))
+
+        self.assertTrue(self.query.update(0, *[1, 11, 21]))
+        self.assertTrue(self.query.update(1, *[2, 12, 22]))
+        self.assertTrue(self.query.update(2, *[3, 13, 23]))
+        self.assertTrue(self.query.update(3, *[4, 14, 24]))
+        
+        self.assertTrue(self.query.update(5, *[6, None, None]))
+        self.assertTrue(self.query.update(6, *[None, None, None]))
+
+        print()
+        print(self.table.str_physical())
+        self.table.merge()
+        
+        print()
+        print(self.table.str_physical())        
+
     def test_insert_update_select(self):
         new_val = [1, 2, 3]
         self.assertTrue(self.query.insert(0, 0, 0))
@@ -327,16 +360,14 @@ class UltimateLstoreTest(unittest.TestCase):
 
         for i, v in enumerate(new_val):
             result = self.query.select(v, i, [True, True, True])
-            if (len(result) > 0):
-                print("Thumbs up")
-            else:
-                print("Thumbs down :(")
+            self.assertEqual(len(result), 1)
 
     def test_everything_all_at_once(self):
+        self.table.index.debug_mode = True
         tuples = []
         for i in range(10_000):
             if i < 9_000:
-                tuples.append((i, -i, 2*i))
+                tuples.append((i, 10 + (i*i) % 127, 2*i))
             else:
                 tuples.append((i, i % 31, i % 10))
 
@@ -348,19 +379,70 @@ class UltimateLstoreTest(unittest.TestCase):
         for i in range(5):
             self.assertFalse(self.query.insert(*t))
 
-        
         self.assertFalse(self.query.update(1_000_000, *[999_999, 10, 20])) # no tuple has pk == 1
         self.assertFalse(self.query.update(0, *[1, 10, 20])) # the pk: 1 is already in use
         self.assertTrue(self.query.update(0, *[1_000_000, 999_999, 999_999])) # the pk: 0 is valid and the pk: -1 is free to use
 
         self.assertEqual(self.query.select(0, 0, [True, True, True]), []) # shouldn't be a row anymore
-        print(self.query.select(999_999, 2, [True, True, True])[0].info_print())
-        print(sorted(list(self.table.column_iterator(2)), key=lambda item: item[1])[-1])
+        self.assertEqual(len(self.query.select(999_999, 2, [True, True, True])), 1)
 
         self.assertEqual(self.query.sum(0, 10_000, 0), 49_995_000) # computed from f(n) = (n*(n+1))/2
-                  
+        self.assertEqual(self.query.sum(999_998, 1_000_000, 1), 999_999)
+
+        self.assertEqual(self.query.sum(0, 5, 1), 105)
+        self.assertEqual(self.query.sum(999_998, 1_000_000, 1), 999_999)
+
+        self.assertTrue(len(self.query.select(999_999, 1, [True, True, True])), 1)
+        # Index should be created here automatically. The queries before and after this moment should be the same.
+        self.assertTrue(len(self.query.select(999_999, 1, [True, True, True])), 1)
+
+        # delete row with pk: 10, make sure it isn't still there, make sure the secondary index updated.
+        attribute_col_1 = self.query.select(10, 0, [False, True, False])[0].columns[0]
+        amount_of_tuples_with_attribute = len(self.query.select(attribute_col_1, 1, [True, True, True]))
+        self.assertTrue(self.query.delete(10) is None)
+        self.assertFalse(self.query.delete(10))
+        self.assertEqual(len(self.query.select(attribute_col_1, 1, [True, True, True])), amount_of_tuples_with_attribute - 1) # Secondary index should be updated
+        self.assertTrue(self.query.update(9, *[10, 123_456, 101_010]))
+        self.assertEqual(len(self.query.select(10, 0, [True, True, True])), 1)
+
+        # delete everything and see what happens
+        primary_keys = [value for value, rid in list(self.table.column_iterator(0))]
+
+        for pk in primary_keys:
+            self.assertTrue(self.query.delete(pk) is None)
+
+        number_of_records = len(list(self.table.column_iterator(0)))
+        self.assertEqual(number_of_records, 0)
+        self.assertEqual(len(self.table.index.indices[0]), 0)
+        self.assertEqual(len(self.table.index.indices[1]), 0)
+
+        self.assertTrue(self.query.insert(0, 10, 100))
+
+        print(self.table.str_physical(base_limit=10, tail_limit=None))
+
+        # Now do multiple updates and inserts and make sure it stays consistent
+        for i in range(5):
+            print("loop!")
+            self.assertTrue(self.query.update(0, *[1, 200, None]))
+            self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 0)
+            self.assertEqual(len(self.query.select(1, 0, [True, True, True])), 1)
+            self.assertEqual(len(self.query.select(10, 1, [True, True, True])), 0)
+            self.assertEqual(len(self.query.select(200, 1, [True, True, True])), 1)
+
+            self.assertTrue(self.query.update(1, *[0, 10, None]))
+            self.assertEqual(len(self.query.select(1, 0, [True, True, True])), 0)
+            self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 1)
+            self.assertEqual(len(self.query.select(200, 1, [True, True, True])), 0)
+            self.assertEqual(len(self.query.select(10, 1, [True, True, True])), 1)
+
+            self.assertEqual(len(self.query.select(100, 2, [True, True, True])), 1)
+
+        print()
+        print(self.table.str_physical(0, None))
+
 
     
+
 if __name__ == '__main__':
     unittest.main()
 

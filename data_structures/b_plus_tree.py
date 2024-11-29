@@ -215,7 +215,7 @@ class BPlusTree:
             return_keys: bool=False,
             debug_mode: bool=False, 
             search_algorithm_threshold=Config.b_plus_tree_search_algorithm_threshold,
-            bulk_insert_threshold=Config.b_plus_tree_bulk_insert_threshold,
+            bulk_insert_threshold=Config.b_plus_tree_bulk_insert_ratio_threshold,
         ):
         self.height = 0
         self.length = 0
@@ -316,20 +316,18 @@ class BPlusTree:
         Up to 10 times faster than inserting items one at a time
         items: a list of key-value tuples
         """
-        if len(self):
-            # We choose an insertion strategy depending on the size of the tree
-            item_ratio = len(items) / len(self)
-            if len(self) < 1000 or item_ratio < Config.b_plus_tree_bulk_insert_threshold:
-                # print("BULK INSERT: new items list too small. Inserting one by one")
-                for key, value in items:
-                    self.insert(key, value)
+        items.sort(key=lambda item: item[0])
+
+        # We choose an insertion strategy depending on the size of the tree
+        item_ratio = len(items) / len(self) if len(self) else len(items)
+        if len(self) < Config.b_plus_tree_bulk_insert_start_threshold or item_ratio < Config.b_plus_tree_bulk_insert_ratio_threshold:
+            # print("BULK INSERT: new items list too small. Inserting one by one")
+            for key, value in items:
+                self.insert(key, value)
                 
-                return
+            return
                 
             # print("BULK INSERT: new items list large enough. Bulk insert as planned!")
-    
-
-        items.sort(key=lambda item: item[0])
 
         # if len(self):
         #     items = list(merge(items, list(self.items())))

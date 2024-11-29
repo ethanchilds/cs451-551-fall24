@@ -21,7 +21,7 @@ from lstore.pool import BufferPool
 import os
 import math
 import struct
-
+import itertools
 
 class Record:
     """A Record stores multiple columns for a single row
@@ -38,6 +38,9 @@ class Record:
 
     def __getitem__(self, index):
         return self.columns[index]
+    
+    def __str__(self):
+        return str(self.columns)
 
 class PageDirectory:
     """The PageDirectory controls access to different pages
@@ -157,6 +160,18 @@ class PageDirectory:
             assert rid < self.num_tail_records
             # return self.data[column_id]['Tail'][page_num].read(order_in_page)
             return self.bufferpool.get_page(page_num, column_id, tail_flg=1, cache_update=cache_update).read(order_in_page)
+        
+    def get_data_attribute(self, rid, column):
+        """
+        Use this to get the newest version of a data attribute.
+        column is a logical column. Don't use the column offset
+        """
+        assert column < self.num_columns
+        indirection = self.get_column_value(rid, Config.indirection_column_idx, tail_flg=False)
+        if indirection == -1:
+            return self.get_column_value(rid, column+Config.column_data_offset, tail_flg=False)
+        else:
+            return self.get_column_value(indirection, column+Config.column_data_offset, tail_flg=True)        
         
     def set_column_value(self, rid, column_id, new_value, tail_flg = 0, cache_update=True):
         assert column_id >= 0 
@@ -341,12 +356,13 @@ class Table:
         return self.page_directory.num_records
 
     def __str__(self):
-        """String representation of the Table
+        """
+        String representation of the logical Table
 
         Returns
         -------
         s : string
-            The string representation of the Table
+            The string representation of the logical Table
         """
 
         # Number of spaces
@@ -395,8 +411,128 @@ class Table:
         """
 
         return self.__str__()
+    
+    def str_physical(self, base_limit=10, tail_limit=10) -> str:
+        """
+        Creates a string of the physical table representation
 
-    def column_iterator(self, column, tail_flg=1):
+        Parameters
+        ----------
+        base_limit : int | None (Default=10)
+            The limit of base tuples to represent
+        tail_limit : int | None (Default=10)
+            The limit of tail tuples to represent
+
+        Returns
+        ------
+        str
+            The pysical table representation string
+        """
+        # Construct Column Names
+        total_columns = self.num_columns + Config.column_data_offset
+        column_widths = [0] * total_columns
+        column_names = [None] * total_columns
+
+        column_names[Config.indirection_column_idx] = "indir"
+        column_names[Config.rid_column_idx] = "rid"
+        column_names[Config.timestamp_column_idx] = "time"
+        column_names[Config.schema_encoding_column_idx] = "schema"
+        column_names[Config.tps_and_brid_column_idx] = "tps/brid"
+        for column in range(self.num_columns):
+            physical_column = column + Config.column_data_offset
+            column_names[physical_column] = str(column)
+            if self.primary_key == column:
+                column_names[physical_column] += ":pk"
+        # End Construct Column Names
+
+        # Construct Table Data
+        base_page_data = []
+        base_clipped = False
+        num_records = self.page_directory.num_records
+        if base_limit is not None and base_limit < num_records:
+            base_clipped = True
+            num_records = base_limit
+        for rid in range(num_records):
+            tuple = []
+            for column in range(total_columns):
+                tuple.append(str(self.page_directory.get_column_value(rid, column, tail_flg=False)))
+            base_page_data.append(tuple)
+
+        tail_page_data = []
+        tail_clipped = False
+        num_tail_records = self.page_directory.num_tail_records
+        if tail_limit is not None and tail_limit < num_tail_records:
+            tail_clipped = True
+            num_tail_records = tail_limit
+        for rid in range(num_tail_records):
+            tuple = []
+            for column in range(total_columns):
+                tuple.append(str(self.page_directory.get_column_value(rid, column, tail_flg=True)))
+            tail_page_data.append(tuple)
+        # End Construct Table Data
+
+        # Construct Column Widths
+        for column, column_name in enumerate(column_names):
+            column_widths[column] = len(column_name) + 2
+        
+        for tuple in base_page_data:
+            for column, attribute in enumerate(tuple):
+                column_widths[column] = max(column_widths[column], len(attribute)+2)
+
+        for tuple in tail_page_data:
+            for column, attribute in enumerate(tuple):
+                column_widths[column] = max(column_widths[column], len(attribute)+2)
+        # End Construct Column Widths
+
+        # Construct String
+        result = ""
+        result += self._str_horizontal_line(widths=column_widths) + "\n"
+        result += self._str_tuple(column_widths, column_names) + "\n"
+        result += self._str_horizontal_line(widths=column_widths) + "\n"
+
+        for tuple in base_page_data:
+            result += self._str_tuple(column_widths, tuple) + "\n"
+        if base_clipped:
+            result += self._str_dots(column_widths) + "\n"
+        if len(tail_page_data) != 0 or tail_clipped:
+            result += self._str_horizontal_line(column_widths) + "\n"
+
+        for tuple in tail_page_data:
+            result += self._str_tuple(column_widths, tuple) + "\n"
+        if tail_clipped:
+            result += self._str_dots(column_widths) + "\n"
+        result += self._str_horizontal_line(column_widths)
+        # End Construct String
+
+        return result
+
+    def _str_horizontal_line(self, widths) -> str:
+        result = "+"
+        for column, width in enumerate(widths):
+            if column != 0:
+                result += "+"
+            result += "-" * width
+        result += "+"
+        return result
+    
+    def _str_tuple(self, widths, tuple) -> str:
+        result = "|"
+        for physical_column, info in enumerate(zip(widths, tuple)):
+            width, attribute = info
+            if physical_column != 0:
+                result += "|"
+
+            left_padding = width - (len(attribute) + 1)
+            
+            result += (" " * left_padding) + attribute + " "
+        result += "|"
+        return result
+    
+    def _str_dots(self, widths):
+        tuple = ["."*min(width-2, 3) for width in widths]
+        return self._str_tuple(widths, tuple)
+
+    def column_iterator(self, column):
         """Iterate through all values in a column
 
         Parameters
@@ -408,10 +544,10 @@ class Table:
 
         Yields
         ------
-        rid : int
-            The RID of the current column
         value : any
             The value of the column at the specific RID
+        rid : int
+            The RID of the current column
         """
 
         # Check if the range is valid
@@ -429,13 +565,7 @@ class Table:
                 # if a tombstone is found, continue
                 continue
 
-            indirection = self.page_directory.get_column_value(rid=i, column_id=indirection_column, tail_flg=0)
-
-            # Only yield if RID is valid
-            if (indirection != -1):
-                yield rid, self.page_directory.get_column_value(indirection, column+Config.column_data_offset, tail_flg=1)
-            else:
-                yield rid, self.page_directory.get_column_value(rid, column+Config.column_data_offset, tail_flg=0)
+            yield self.page_directory.get_data_attribute(rid, column), rid
         
     def get_column(self, column_index):
         if column_index >= self.num_columns or column_index < 0:
