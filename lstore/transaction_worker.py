@@ -86,7 +86,7 @@ class TransactionWorker:
                     self.fail_list.append(transaction)
             
             # stores the number of transactions that committed
-            self.result = len(list(filter(lambda x: x, self.stats)))
+            self.result += len(list(filter(lambda x: x, self.stats)))
 
             # Remove all elements which committed successfully or failed with an error
             for t in self.commit_list:

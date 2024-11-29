@@ -34,7 +34,8 @@ class Transaction:
         """
 
         # Add the query to the query list
-        self.queries.append((query, table, args))
+        wrapper = QueryWrapper(query, table, self, args)
+        self.queries.append(wrapper)
 
         # Add the lock manager to the lock manager set
         self.lock_managers.add(table.lock_manager)
@@ -54,10 +55,10 @@ class Transaction:
             False will be returned on abort
         """
 
-        for query, table, args in self.queries:
-            # Wrap the query in a QueryWrapper wrapper
-            query_wrapper = QueryWrapper(query, table)
-            result = query_wrapper.try_run(*args)
+        # Loop through all queries
+        for wrapper in self.queries:
+            # Try to run the wrapped query
+            result = wrapper.try_run()
             
             # If the query has failed the transaction should abort
             if result == False:
@@ -90,7 +91,8 @@ class Transaction:
         """
 
         #TODO: do roll-back and any other necessary operations
-
+        for wrapper in reversed(self.queries):
+            wrapper.revert()
 
         # Release all held locks
         self.__release_all()

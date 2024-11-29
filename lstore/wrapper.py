@@ -14,7 +14,7 @@ class QueryWrapper():
     concurrent queries to take place seamlessly.
     """
 
-    def __init__(self, table, query_function, transaction):
+    def __init__(self, table, query_function, transaction, args):
         """
         Initialize a new ThreadedQuery which wraps
         a specific query function.  This allows
@@ -27,13 +27,18 @@ class QueryWrapper():
             The Table object to control access to
         query_function : function
             A specific Query function to try to execute
+        transaction : Transaction
+            The Transaction object associated with the Query
+        args : list
+            A list of arguments to be passed into the query_function
         """
         
         # Set up internal variables
         self.table = table
         self.query_function = query_function
-        self.lock_manager = self.table.lock_manager
         self.transaction = transaction
+        self.args = args
+        self.lock_manager = self.table.lock_manager
 
         # While we could find these values at initialization
         # it requires the index lock, so wait until try_run.
@@ -48,7 +53,7 @@ class QueryWrapper():
             self.update_schema = None
         # Determine hooks
 
-    def try_run(self, *args):
+    def try_run(self):
         """Try run
 
         This function will try to run
@@ -65,7 +70,7 @@ class QueryWrapper():
 
         # Find which resources are accessed
 
-        resources = self.__find_resources(*args)
+        resources = self.__find_resources(*self.args)
 
         
         # request index lock first
@@ -78,10 +83,10 @@ class QueryWrapper():
 
         # Update the query rid
         if self.query_function == Query.delete:
-            self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=args[0])
+            self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
         # update the query schema
         elif self.query_function == Query.update:
-            rid = self.table.index.locate(column=self.table.primary_key, value=args[0])
+            rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
             self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, )
 
         for i in range(1, len(resources)):
@@ -91,7 +96,7 @@ class QueryWrapper():
             if lock == None:
                 return False
 
-        return self.query_function(*args)
+        return self.query_function(*self.args)
     
     def __find_resources(self, *args):
         """Find resources
@@ -156,6 +161,8 @@ class QueryWrapper():
             resources.append((Config.SHARED_LOCK, ('Index'), self.transaction))
             for i in range(args[0], args[1]):
                 resources.append((Config.SHARED_LOCK, (i, Config.rid_column_idx), self.transaction))
+        
+        return resources
 
     def roll_back(self, primary_key):
         if self.query_function == Query.delete:
@@ -169,6 +176,16 @@ class QueryWrapper():
 
         elif self.query_function == Query.update:
             pass
+
+    def revert(self):
+        """
+        Revert the internal operations of the given
+        query to prevent it from persisting in the
+        database.
+        """
+
+        # TODO: Revert the query using stored internal args/state
+        pass
 
     def __enter__(self):
         """
