@@ -351,7 +351,8 @@ class LockManager():
 
         with self.__lock:
             # Loop through all keys in the transaction dictionary for the given transaction
-            for key in self.transaction_dictionary[transaction]:
+            keys = list(self.transaction_dictionary[transaction])  # Prevents dictionary resize errors
+            for key in keys:
                 # Check the lock type
                 if (key[0] == Config.SHARED_LOCK):
                     status = self.__remove_shared_lock(key, transaction)
