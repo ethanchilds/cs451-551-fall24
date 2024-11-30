@@ -5,6 +5,17 @@ from bintrees import *
 from utilities.timer import timer
 from random import *
 
+import unittest
+from test import UltimateLstoreTest
+from lstore.index import TestIndexDataStructures
+from test import UltimateLstoreTest
+from lstore.table import Table
+
+
+unittest.main()
+
+
+
 def test_data_structure_correctness(DataStructure, operations):
     data_structure = DataStructure()
 
@@ -207,8 +218,8 @@ import unittest
 # from utilities.algorithms import TestAlgorithms
 from data_structures.b_plus_tree import TestNode as TestBPlusNode
 from data_structures.b_plus_tree import BPlusTree, TestBPlusTree
+from lstore.index import TestIndexDataStructures
 
-# unittest.main()
 
 # map = test_data_structure_get_speed(HashMap, 1_000_000)
 
@@ -221,6 +232,38 @@ from data_structures.b_plus_tree import BPlusTree, TestBPlusTree
 from lstore.db import Database
 from lstore.index import Index
 from lstore.query import Query
+import time
+
+l = [1, 1, 2, 6, 24, 120, 720]
+print(l)
+exit()
+
+tree = BPlusTree(minimum_degree=2, unique_keys=False, return_keys=False)
+# tree.insert(1, 1)
+# tree.insert(1, 2)
+# tree.insert(2, 2)
+# tree.insert(3, 3)
+# tree.insert(3, 4)
+# tree.insert(1, 3)
+# tree.insert(1, 3)
+items = [(i, i) for i in range(500_001)]
+# items.extend([(i, i+1) for i in range(50000)])
+s1 = time.time()
+tree.bulk_insert(items)
+e1 = time.time()
+# print(tree)
+
+tree2 = BPlusTree(minimum_degree=2, unique_keys=False, return_keys=False)
+s2 = time.time()
+for key, value in items:
+    tree2.insert(key, value)
+e2 = time.time()
+
+print(f"t1: {e1 - s1}")
+print(f"t2: {e2 - s2}")
+print(tree == tree2)
+
+exit()
 
 
 # COMPARING INSERT VS BULK INSERT (min degree 128) (items already sorted)

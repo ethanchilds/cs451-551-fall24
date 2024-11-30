@@ -50,9 +50,10 @@ class Query:
             return False
         else:
             assert len(rids) == 1
-            self.table.index.maintain_delete(primary_key)
+            rid = rids[0]
+            self.table.index.maintain_delete(rid)
             # assert self.table.index.locate(column=self.table.primary_key, value=columns[0])[0] == new_rid
-            return self.table.delete(rids[0])
+            return self.table.delete(rid)
         if (primary_key in self.table):
             # TODO: Eventually check for LOCK state
 
@@ -189,6 +190,14 @@ class Query:
         #     if self.table.page_directory.get_column_value(rid, self.table.primary_key+Config.column_data_offset) == primary_key:
         #         found_rids.append(rid)
 
+        # locate rid using index
+        # look at base rid column at rid using page_directory
+        # index is updated with rid and new tuple
+        # look at base rid column at rid using page_directory (again?)
+        # look at base ind column at rid using page_directory
+        # look at base sch column at rid using page_directory
+        # if ind != -1, select query on the primary key
+
         found_rids = self.table.index.locate(column=self.table.primary_key, value=primary_key)
 
         relevant_rids = []
@@ -198,25 +207,16 @@ class Query:
             if self.table.page_directory.get_column_value(rid, Config.rid_column_idx) != -1:
                 relevant_rids.append(rid)
 
-        if not relevant_rids:
+        if len(relevant_rids) == 0:
             return False
 
         # should be only one base rid
         assert len(relevant_rids) == 1
 
-        try:
-            self.table.index.maintain_update(primary_key, columns)
-        except NonUniqueKeyError:
-            return False
-        except KeyError:
-            return False
-        except Exception as e:
-            raise e
-
-        columns_values = [-1] * (len(columns) + Config.column_data_offset)
-
         # need base meta information
         rid = relevant_rids[0]
+
+        columns_values = [-1] * (len(columns) + Config.column_data_offset)
 
         base_rid = self.table.page_directory.get_column_value(rid, Config.rid_column_idx, tail_flg=0)
         base_ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx, tail_flg=0)
@@ -242,6 +242,15 @@ class Query:
             for i in range(len(columns)):
                 if utils.get_bit(base_schema, i):
                     columns_values[i + Config.column_data_offset] = old_record.columns[i]
+
+        try:
+            self.table.index.maintain_update(rid, columns)
+        except NonUniqueKeyError:
+            return False
+        except KeyError:
+            return False
+        except Exception as e:
+            raise e
 
         # for all columns passed in check if they are Nonetype,
         # if not add it tail record and adjust schema accordingly
