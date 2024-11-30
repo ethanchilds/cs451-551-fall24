@@ -8,6 +8,9 @@ from random import *
 import unittest
 from test import UltimateLstoreTest
 from lstore.index import TestIndexDataStructures
+from data_structures.b_plus_tree import TestBPlusTree
+from test import TestLstoreDB
+from test import TestLstoreIndex
 from test import UltimateLstoreTest
 from lstore.table import Table
 

@@ -173,13 +173,14 @@ class PageDirectory:
         indirection = self.get_column_value(rid, Config.indirection_column_idx, tail_flg=False)
         if indirection == -1:
             return self.get_column_value(rid, column+Config.column_data_offset, tail_flg=False)
-        else:
-            return self.get_column_value(indirection, column+Config.column_data_offset, tail_flg=True)        
+        schema = self.get_column_value(indirection, Config.schema_encoding_column_idx, tail_flg=True)
+        if utils.get_bit(schema, column):  
+            return self.get_column_value(indirection, column+Config.column_data_offset, tail_flg=True)    
+        return self.get_column_value(rid, column+Config.column_data_offset, tail_flg=False)          
         
     def set_column_value(self, rid, column_id, new_value, tail_flg = 0, cache_update=True):
         assert column_id >= 0 
         assert column_id < self.num_columns
-
         page_capacity = Config.page_size // 8
         page_num = rid // page_capacity
         order_in_page = rid % page_capacity

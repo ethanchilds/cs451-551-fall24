@@ -152,7 +152,8 @@ class Index:
             return
         
         if self.usage_histogram[column][RANGE_QUERY] >= 2 or self.usage_histogram[column][POINT_QUERY] >= 2:
-            print(f"AUTOMATICALLY CREATING INDEX ON COLUMN {column}")
+            if self.debug_mode:
+                print(f"AUTOMATICALLY CREATING INDEX ON COLUMN {column}")
             self.create_index(column, ordered=True, unique_keys=False)
 
 import unittest

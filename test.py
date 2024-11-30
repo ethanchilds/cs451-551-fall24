@@ -415,7 +415,6 @@ class UltimateLstoreTest(unittest.TestCase):
             self.assertEqual(len(result), 1)
 
     def test_everything_all_at_once(self):
-        self.table.index.debug_mode = True
         tuples = []
         for i in range(10_000):
             if i < 9_000:
@@ -470,11 +469,10 @@ class UltimateLstoreTest(unittest.TestCase):
 
         self.assertTrue(self.query.insert(0, 10, 100))
 
-        print(self.table.str_physical(base_limit=10, tail_limit=None))
+        # print(self.table.str_physical(base_limit=10, tail_limit=None))
 
         # Now do multiple updates and inserts and make sure it stays consistent
         for i in range(5):
-            print("loop!")
             self.assertTrue(self.query.update(0, *[1, 200, None]))
             self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 0)
             self.assertEqual(len(self.query.select(1, 0, [True, True, True])), 1)
@@ -486,11 +484,22 @@ class UltimateLstoreTest(unittest.TestCase):
             self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 1)
             self.assertEqual(len(self.query.select(200, 1, [True, True, True])), 0)
             self.assertEqual(len(self.query.select(10, 1, [True, True, True])), 1)
+            self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 1)
 
             self.assertEqual(len(self.query.select(100, 2, [True, True, True])), 1)
 
         # print()
-        # print(self.table.str_physical(0, None))
+
+    def test_update_but_not_column_two(self):
+        self.assertTrue(self.query.insert(0, 0, 0))
+        self.assertTrue(self.query.update(0, *[1, 1, 1]))
+        self.assertTrue(self.query.update(1, *[2, 2, None]))
+        self.assertEqual(len(self.query.select(1, 2, [True, True, True])), 1)
+
+        self.assertTrue(self.query.insert(10, 10, 10))
+        self.assertTrue(self.query.update(10, *[11, 11, None]))
+        self.assertTrue(self.query.update(11, *[12, 12, None]))
+        self.assertEqual(len(self.query.select(10, 2, [True, True, True])), 1)
 
 
     
