@@ -458,10 +458,10 @@ class Table:
             base_clipped = True
             num_records = base_limit
         for rid in range(num_records):
-            tuple = []
+            values = []
             for column in range(total_columns):
-                tuple.append(str(self.page_directory.get_column_value(rid, column, tail_flg=False)))
-            base_page_data.append(tuple)
+                values.append(str(self.page_directory.get_column_value(rid, column, tail_flg=False)))
+            base_page_data.append(values)
 
         tail_page_data = []
         tail_clipped = False
@@ -470,22 +470,22 @@ class Table:
             tail_clipped = True
             num_tail_records = tail_limit
         for rid in range(num_tail_records):
-            tuple = []
+            values = []
             for column in range(total_columns):
-                tuple.append(str(self.page_directory.get_column_value(rid, column, tail_flg=True)))
-            tail_page_data.append(tuple)
+                values.append(str(self.page_directory.get_column_value(rid, column, tail_flg=True)))
+            tail_page_data.append(values)
         # End Construct Table Data
 
         # Construct Column Widths
         for column, column_name in enumerate(column_names):
             column_widths[column] = len(column_name) + 2
         
-        for tuple in base_page_data:
-            for column, attribute in enumerate(tuple):
+        for values in base_page_data:
+            for column, attribute in enumerate(values):
                 column_widths[column] = max(column_widths[column], len(attribute)+2)
 
-        for tuple in tail_page_data:
-            for column, attribute in enumerate(tuple):
+        for values in tail_page_data:
+            for column, attribute in enumerate(values):
                 column_widths[column] = max(column_widths[column], len(attribute)+2)
         # End Construct Column Widths
 
@@ -495,15 +495,15 @@ class Table:
         result += self._str_tuple(column_widths, column_names) + "\n"
         result += self._str_horizontal_line(widths=column_widths) + "\n"
 
-        for tuple in base_page_data:
-            result += self._str_tuple(column_widths, tuple) + "\n"
+        for values in base_page_data:
+            result += self._str_tuple(column_widths, values) + "\n"
         if base_clipped:
             result += self._str_dots(column_widths) + "\n"
         if len(tail_page_data) != 0 or tail_clipped:
             result += self._str_horizontal_line(column_widths) + "\n"
 
-        for tuple in tail_page_data:
-            result += self._str_tuple(column_widths, tuple) + "\n"
+        for values in tail_page_data:
+            result += self._str_tuple(column_widths, values) + "\n"
         if tail_clipped:
             result += self._str_dots(column_widths) + "\n"
         result += self._str_horizontal_line(column_widths)
@@ -520,9 +520,9 @@ class Table:
         result += "+"
         return result
     
-    def _str_tuple(self, widths, tuple) -> str:
+    def _str_tuple(self, widths, values) -> str:
         result = "|"
-        for physical_column, info in enumerate(zip(widths, tuple)):
+        for physical_column, info in enumerate(zip(widths, values)):
             width, attribute = info
             if physical_column != 0:
                 result += "|"
@@ -534,8 +534,8 @@ class Table:
         return result
     
     def _str_dots(self, widths):
-        tuple = ["."*min(width-2, 3) for width in widths]
-        return self._str_tuple(widths, tuple)
+        dots = ["."*min(width-2, 3) for width in widths]
+        return self._str_tuple(widths, dots)
 
     def column_iterator(self, column):
         """Iterate through all values in a column
