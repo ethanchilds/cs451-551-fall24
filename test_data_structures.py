@@ -6,6 +6,8 @@ from utilities.timer import timer
 from random import *
 
 import unittest
+from test import TestLstoreIndexUndo
+unittest.main()
 from test import UltimateLstoreTest
 from lstore.index import TestIndexDataStructures
 from data_structures.b_plus_tree import TestBPlusTree

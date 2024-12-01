@@ -354,6 +354,83 @@ class TestLstoreIndex(unittest.TestCase):
 
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
 
+class TestLstoreIndexUndo(unittest.TestCase):
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.create_table("Index Undo", 3, 1)
+        self.query = Query(self.table)
+        self.index = self.table.index
+
+    def tearDown(self):
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
+
+    def test_one_insert(self):
+        self.assertTrue(self.query.insert(0, 101100011001, 1))
+        self.assertEqual(list(self.index.indices[1].items()), [(101100011001, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])
+
+    def test_one_insert_then_update(self):
+        self.assertTrue(self.query.insert(10, 0, 10))
+        self.assertTrue(self.query.update(0, *[11, 1, 11]))
+        self.assertEqual(list(self.index.indices[1].items()), [(1, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+
+    def test_one_insert_then_delete(self):
+        self.assertTrue(self.query.insert(10, 0, 10))
+        self.assertTrue(self.query.delete(0) is None)
+        self.assertEqual(list(self.index.indices[1].items()), [])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])  
+
+    def test_one_insert_then_delete(self):
+        self.assertTrue(self.query.insert(10, 0, 10))
+        self.assertTrue(self.query.delete(0) is None)
+        self.assertEqual(list(self.index.indices[1].items()), [])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])  
+
+    def test_two_inserts(self):
+        self.assertTrue(self.query.insert(111, 0, 111))
+        self.assertTrue(self.query.insert(222, 1, 222))
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0), (1, 1)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])
+
+    def test_insert_update_insert(self):
+        self.assertTrue(self.query.insert(111, 0, 111))
+        self.assertTrue(self.query.update(0, *[222, 1, 222]))
+        self.assertEqual(list(self.index.indices[1].items()), [(1, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])
+
+    def test_insert_insert_update(self):
+        self.assertTrue(self.query.insert(111, 0, 111))
+        self.assertTrue(self.query.insert(222, 1, 222))
+        self.assertTrue(self.query.update(0, *[None, 2, None]))
+        self.assertEqual(list(self.index.indices[1].items()), [(1, 1), (2, 0)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0), (1, 1)])
+        self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [(0, 0)])
+        self.index.indices[1].delete(0)
+        print(self.index.indices[1])
+        print(self.index.log[-1])
+
+        # self.index.undo()
+        self.assertEqual(list(self.index.indices[1].items()), [])
+
 import time
 # from random import shuffle
 class UltimateLstoreTest(unittest.TestCase):
@@ -487,6 +564,9 @@ class UltimateLstoreTest(unittest.TestCase):
             self.assertEqual(len(self.query.select(0, 0, [True, True, True])), 1)
 
             self.assertEqual(len(self.query.select(100, 2, [True, True, True])), 1)
+
+        self.table.index.undo()
+        self.table.index.undo()
 
         # print()
 

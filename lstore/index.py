@@ -22,6 +22,24 @@ class Index:
     Don't forget to maintain the index using maintain_insert and maintain_delete.
     The index needs to be told when the table is changed.
     Take care of your index!!!
+
+    methods:
+    __init__
+
+    locate
+    locate_range
+
+    create_index
+    drop_index
+
+    _locate_linear
+    _locate_range_linear
+
+    maintain_insert
+    maintain_update
+    maintain_delete
+
+    _consider_new_index
     """
     def __init__(self, table, benchmark_mode=False, debug_mode=False, automatic_new_indexes=True):
         self.indices = [None] *  table.num_columns
@@ -33,6 +51,8 @@ class Index:
         self.debug_mode = debug_mode
         self.automatic_new_indexes = automatic_new_indexes
         self.has_unique_keys = [False] * table.num_columns
+        self.undo_mode = False  # Turn on while reverting / undoing. Turn off after.
+        self.log = []
 
         # Default unique key index on the primary key.
         self.create_index(column=table.primary_key, unique_keys=True, ordered=True)
@@ -89,12 +109,17 @@ class Index:
 
         items = list(self.table.column_iterator(column))
         data_structure.bulk_insert(items)
+        
+        if not self.undo_mode: self.log.append(("create_index", "write the column the index we made on so we can delete it"))
 
     def drop_index(self, column_number):
         """
         Drop index of specific column
         """
         self.indices[column_number] = None
+
+        # reverting this is really slow. Be smart.
+        if not self.undo_mode: self.log.append(("drop_index", "create index"))
     
     def _locate_linear(self, column, target_value):
         """
@@ -120,29 +145,40 @@ class Index:
                 continue
 
             self.indices[column].insert(attribute, rid)
+        
+        if not self.undo_mode: self.log.append((self.maintain_delete, [rid]))
 
     def maintain_update(self, rid, new_tuple):
         """
         rid is assumed to be valid
         otherwise, undefined behavior!!!
-        """       
+        """ 
+        if not self.undo_mode: old_tuple = [None] * self.table.num_columns      
         for column, new_attribute in enumerate(new_tuple):
             index = self.indices[column]
             if (index is None) or (new_attribute is None):
                 continue
 
             old_attribute = self.table.page_directory.get_data_attribute(rid, column)
+            if not self.undo_mode: old_tuple[column] = old_attribute
             index.update(old_attribute, new_attribute, rid)
+
+        if not self.undo_mode: self.log.append((self.maintain_update, [rid, old_tuple]))
+        
     
     def maintain_delete(self, rid):
         """
         rid is assumed to be valid
         otherwise, undefined behavior!!!
         """
+        if not self.undo_mode: tuple = [None] * self.table.num_columns
         for column, index in enumerate(self.indices):
             if index:
                 attribute = self.table.page_directory.get_data_attribute(rid, column)
+                if not self.undo_mode: tuple[column] = attribute
                 index.remove(attribute, rid)
+
+        if not self.undo_mode: self.log.append((self.maintain_insert, [tuple, rid]))
     
     def _consider_new_index(self, column):
         if self.automatic_new_indexes == False:
@@ -155,6 +191,27 @@ class Index:
             if self.debug_mode:
                 print(f"AUTOMATICALLY CREATING INDEX ON COLUMN {column}")
             self.create_index(column, ordered=True, unique_keys=False)
+
+    def clear_log(self):
+        self.log = []
+
+    def undo(self):
+        """
+        This depends on the state of the table, 
+        so make sure the table is being undone at the same time.
+        """
+        raise NotImplementedError
+        assert len(self.log) > 0
+        self.undo_mode = True
+ 
+        method, arguments = self.log.pop()
+        method(*arguments)
+
+        self.undo_mode = False
+
+    def revert(self):
+        while len(self.log) > 0:
+            self.undo()
 
 import unittest
 from random import shuffle
