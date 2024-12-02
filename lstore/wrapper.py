@@ -170,8 +170,21 @@ class QueryWrapper():
         return resources
 
     def roll_back(self, primary_key):
+        """Roll back changes
+
+        If the query is one that must
+        be reverted if transaction
+        aborts, roll back changes.
+
+        Parameters
+        ----------
+        primary_key: int
+            primary key of the record changed
+        """
         if self.query_function == Query.delete:
             # Set deleted row rid back to original rid
+            # WARNING: I don't know if set_column_value will find the location given it's gravestone
+            # however, logically the location should still be able to be found based on how rid is made
             self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
 
         elif self.query_function == Query.insert:
@@ -180,7 +193,18 @@ class QueryWrapper():
             self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
 
         elif self.query_function == Query.update:
-            pass
+            # Get necessary data for roll back
+            rid = self.table.index.locate(column=self.table.primary_key, value = primary_key)
+            ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
+            old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
+
+            # gravestone tail page
+            self.table.page_directory.set_column_value(ind, Config.rid_column_idx, -1, tail_flg=1)
+
+            # revert old base meta data back to original
+            self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
+            self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
+
 
     def revert(self):
         """
