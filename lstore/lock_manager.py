@@ -32,7 +32,7 @@ class LockManager():
     def __add_transaction(self, key, transaction):
         """Internal method to add transactions
 
-        This maintainings the transaction dictionary when
+        This maintains the transaction dictionary when
         a transaction is added.
 
         Parameters
@@ -54,7 +54,7 @@ class LockManager():
     def __remove_transaction(self, key, transaction):
         """Internal method to remove transactions
 
-        This maintainings the transaction dictionary when
+        This maintains the transaction dictionary when
         a transaction is removed.
 
         Parameters
@@ -350,18 +350,20 @@ class LockManager():
         """
 
         with self.__lock:
-            # Loop through all keys in the transaction dictionary for the given transaction
-            keys = list(self.transaction_dictionary[transaction])  # Prevents dictionary resize errors
-            for key in keys:
-                # Check the lock type
-                if (key[0] == Config.SHARED_LOCK):
-                    status = self.__remove_shared_lock(key, transaction)
-                    if (status == False):
-                        return False
-                elif (key[0] == Config.EXCLUSIVE_LOCK):
-                    status = self.__remove_exclusive_lock(key, transaction)
-                    if (status == False):
-                        return False
-            
+            # Check if the transaction actually has any locks currently
+            if (transaction in self.transaction_dictionary):
+                # Loop through all keys in the transaction dictionary for the given transaction
+                keys = list(self.transaction_dictionary[transaction])  # Prevents dictionary resize errors
+                for key in keys:
+                    # Check the lock type
+                    if (key[0] == Config.SHARED_LOCK):
+                        status = self.__remove_shared_lock(key, transaction)
+                        if (status == False):
+                            return False
+                    elif (key[0] == Config.EXCLUSIVE_LOCK):
+                        status = self.__remove_exclusive_lock(key, transaction)
+                        if (status == False):
+                            return False
+                
             # All removals completed successfully
             return True

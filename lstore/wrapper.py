@@ -115,15 +115,20 @@ class QueryWrapper():
         resources
             list of locks needed for query.
         """
+
+        # Store a list of resources
         resources = []
 
+        # Resolve to the unbounded method for comparison
+        func = self.query_function.__func__
         
-        if self.query_function == Query.delete:
+        # Compare which function to use
+        if func == Query.delete:
             # Write only that affects only one column
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             resources.append((Config.EXCLUSIVE_LOCK, (args[0], Config.rid_column_idx), self.transaction))
 
-        elif self.query_function == Query.insert:
+        elif func == Query.insert:
             primary = args[self.table.primary_key]
 
             # Write only on all columns
@@ -131,7 +136,7 @@ class QueryWrapper():
             for i in range(len(args) + Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif self.query_function == Query.update:
+        elif func == Query.update:
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
@@ -144,7 +149,7 @@ class QueryWrapper():
             for i in range(len(columns)+Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif self.query_function == Query.select:
+        elif func == Query.select:
             project_columns = args[2]
             primary = args[0]
 
@@ -154,7 +159,7 @@ class QueryWrapper():
                 if project_columns[i]:
                     resources.append((Config.SHARED_LOCK, (primary, i+Config.column_data_offset), self.transaction))
 
-        elif self.query_function == Query.sum:
+        elif func== Query.sum:
             # read only on just the primary key column
             # WARNING: sum may function on a range that includes the final value
             # If so, must change range to (args[0], args[1]+1)

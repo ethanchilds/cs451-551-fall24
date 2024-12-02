@@ -34,7 +34,7 @@ class Transaction:
         """
 
         # Add the query to the query list
-        wrapper = QueryWrapper(query, table, self, args)
+        wrapper = QueryWrapper(table, query, self, args)
         self.queries.append(wrapper)
 
         # Add the lock manager to the lock manager set
