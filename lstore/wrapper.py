@@ -150,7 +150,7 @@ class QueryWrapper():
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
-            columns = args[1]
+            columns = args[1:]
 
             # As a record will need to be written in each column
             # an exclusive lock will eventually be needed on all columns
