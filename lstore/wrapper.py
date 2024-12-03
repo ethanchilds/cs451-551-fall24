@@ -159,7 +159,7 @@ class QueryWrapper():
             for i in range(len(columns)+Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif func == Query.select:
+        elif func == Query.select or func == Query.select_version:
             project_columns = args[2]
             primary = args[0]
 
@@ -169,7 +169,7 @@ class QueryWrapper():
                 if project_columns[i]:
                     resources.append((Config.SHARED_LOCK, (primary, i+Config.column_data_offset), self.transaction))
 
-        elif func== Query.sum:
+        elif func == Query.sum or func == Query.sum_version:
             # read only on just the primary key column
             # WARNING: sum may function on a range that includes the final value
             # If so, must change range to (args[0], args[1]+1)
