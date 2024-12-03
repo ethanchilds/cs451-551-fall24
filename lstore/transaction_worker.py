@@ -20,8 +20,8 @@ class TransactionWorker:
         self.stats = []  # Which transactions failed and which succeeded
         self.transactions = transactions
         self.result = 0
-        self.commit_list = []  # A list of successful Transaction objects
-        self.fail_list = []  # A list of failed Transaction objects (errored)
+        self.commit_set = set()  # A set of successful Transaction objects
+        self.fail_set = set()  # A set of failed Transaction objects (errored)
 
         # Current running thread
         self.current_thread = None
@@ -81,18 +81,17 @@ class TransactionWorker:
 
                 # Record which transactions committed/failed
                 if (result == True):
-                    self.commit_list.append(transaction)
+                    self.commit_set.add(transaction)
                 elif (result == None):
-                    self.fail_list.append(transaction)
+                    self.commit_set.add(transaction)
             
             # stores the number of transactions that committed
             self.result += len(list(filter(lambda x: x, self.stats)))
 
             # Remove all elements which committed successfully or failed with an error
-            for t in self.commit_list:
+            for t in self.commit_set:
                 self.transactions.remove(t)
-            self.commit_list = []
-            for t in self.fail_list:
+            self.commit_set = set()
+            for t in self.fail_set:
                 self.transactions.remove(t)
-            self.fail_list = []
-
+            self.fail_set = set()
