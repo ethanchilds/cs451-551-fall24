@@ -1,4 +1,5 @@
 from utilities.algorithms import binary_search, linear_search
+from utilities.latch import Latch
 from config import Config
 from errors import *
 from random import random
@@ -14,6 +15,7 @@ class Node:
         self.link = None    # Should be none unless a leaf.
         self.rev_link = None
         self.parent = parent  # Should be none only if a root.
+        self.latch = Latch()
         
         self.keys = []
         self.values = []

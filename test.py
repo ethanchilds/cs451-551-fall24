@@ -565,8 +565,8 @@ class UltimateLstoreTest(unittest.TestCase):
 
             self.assertEqual(len(self.query.select(100, 2, [True, True, True])), 1)
 
-        self.table.index.undo()
-        self.table.index.undo()
+        # self.table.index.undo()
+        # self.table.index.undo()
 
         # print()
 

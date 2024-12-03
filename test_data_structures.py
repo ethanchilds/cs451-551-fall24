@@ -6,7 +6,8 @@ from utilities.timer import timer
 from random import *
 
 import unittest
-from test import TestLstoreIndexUndo
+# from test import TestLstoreIndexUndo
+from utilities.latch import TestLatch
 unittest.main()
 from test import UltimateLstoreTest
 from lstore.index import TestIndexDataStructures
@@ -15,11 +16,6 @@ from test import TestLstoreDB
 from test import TestLstoreIndex
 from test import UltimateLstoreTest
 from lstore.table import Table
-
-
-unittest.main()
-
-
 
 def test_data_structure_correctness(DataStructure, operations):
     data_structure = DataStructure()
