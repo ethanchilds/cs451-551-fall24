@@ -34,7 +34,7 @@ class Transaction:
         """
 
         # Add the query to the query list
-        wrapper = QueryWrapper(query, table, self, args)
+        wrapper = QueryWrapper(table, query, self, args)
         self.queries.append(wrapper)
 
         # Add the lock manager to the lock manager set
@@ -92,7 +92,7 @@ class Transaction:
 
         #TODO: do roll-back and any other necessary operations
         for wrapper in reversed(self.queries):
-            wrapper.revert()
+            wrapper.roll_back()
 
         # Release all held locks
         self.__release_all()

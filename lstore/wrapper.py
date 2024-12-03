@@ -39,18 +39,23 @@ class QueryWrapper():
         self.transaction = transaction
         self.args = args
         self.lock_manager = self.table.lock_manager
+        self.work_flag = False
 
         # While we could find these values at initialization
         # it requires the index lock, so wait until try_run.
         # Also saves some work.
 
         # In case of delete roll back
+        if self.query_function != Query.insert:
+            self.primary_key = self.args[self.table.primary_key]
+
         if self.query_function == Query.delete:
             self.delete_rid = None
 
         # in case of update roll back
         if self.query_function == Query.update:
             self.update_schema = None
+            self.primary_key = self.args[0]
         # Determine hooks
 
     def try_run(self):
@@ -96,7 +101,12 @@ class QueryWrapper():
             if lock == None:
                 return False
 
-        return self.query_function(*self.args)
+        query_result = self.query_function(*self.args)
+        if not query_result:
+            return None
+        else:
+            self.work_flag = True
+            return query_result
     
     def __find_resources(self, *args):
         """Find resources
@@ -115,15 +125,20 @@ class QueryWrapper():
         resources
             list of locks needed for query.
         """
+
+        # Store a list of resources
         resources = []
 
+        # Resolve to the unbounded method for comparison
+        func = self.query_function.__func__
         
-        if self.query_function == Query.delete:
+        # Compare which function to use
+        if func == Query.delete:
             # Write only that affects only one column
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             resources.append((Config.EXCLUSIVE_LOCK, (args[0], Config.rid_column_idx), self.transaction))
 
-        elif self.query_function == Query.insert:
+        elif func == Query.insert:
             primary = args[self.table.primary_key]
 
             # Write only on all columns
@@ -131,7 +146,7 @@ class QueryWrapper():
             for i in range(len(args) + Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif self.query_function == Query.update:
+        elif func == Query.update:
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
@@ -144,7 +159,7 @@ class QueryWrapper():
             for i in range(len(columns)+Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif self.query_function == Query.select:
+        elif func == Query.select:
             project_columns = args[2]
             primary = args[0]
 
@@ -154,7 +169,7 @@ class QueryWrapper():
                 if project_columns[i]:
                     resources.append((Config.SHARED_LOCK, (primary, i+Config.column_data_offset), self.transaction))
 
-        elif self.query_function == Query.sum:
+        elif func== Query.sum:
             # read only on just the primary key column
             # WARNING: sum may function on a range that includes the final value
             # If so, must change range to (args[0], args[1]+1)
@@ -164,37 +179,35 @@ class QueryWrapper():
         
         return resources
 
-    def roll_back(self, primary_key):
-        if self.query_function == Query.delete:
-            # Set deleted row rid back to original rid
-            self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
+    def roll_back(self):
+        """Roll back changes
 
-        elif self.query_function == Query.insert:
-            # Get rid of new record and set its rid to -1
-            rid = self.table.index.locate(column=self.table.primary_key, value=primary_key)
-            self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
-
-        elif self.query_function == Query.update:
-            pass
-
-    def revert(self):
+        If the query is one that must
+        be reverted if transaction
+        aborts, roll back changes.
         """
-        Revert the internal operations of the given
-        query to prevent it from persisting in the
-        database.
-        """
+        
+        if self.work_flag:
+            if self.query_function == Query.delete:
+                # Set deleted row rid back to original rid
+                # WARNING: I don't know if set_column_value will find the location given it's gravestone
+                # however, logically the location should still be able to be found based on how rid is made
+                self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
 
-        # TODO: Revert the query using stored internal args/state
-        pass
+            elif self.query_function == Query.insert:
+                # Get rid of new record and set its rid to -1
+                rid = self.table.index.locate(column=self.table.primary_key, value=self.primary_key)
+                self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
 
-    def __enter__(self):
-        """
-        When starting up the wrapper function,
-        determine all possible dependencies
-        and establish locks.
-        """
+            elif self.query_function == Query.update:
+                # Get necessary data for roll back
+                rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)
+                ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
+                old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
 
-        pass
+                # gravestone tail page
+                self.table.page_directory.set_column_value(ind, Config.rid_column_idx, -1, tail_flg=1)
 
-    def __exit__(self, *args):
-        pass
+                # revert old base meta data back to original
+                self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
+                self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
