@@ -7,6 +7,8 @@ from lstore.block import Block
 from lstore.page import Page
 from lstore.cache_policy import LeakyBucketCachePolicy, LRUCachePolicy, MRUCachePolicy
 from data_structures.priority_queue import PriorityQueue
+from collections import defaultdict
+import threading
 
 """
 This is responsible for defining a pool of
@@ -68,6 +70,9 @@ class BufferPool():
         # Create a list of pins and dirty blocks
         # self.pinned_blocks
         self.dirty_blocks = set()
+        self.pinned_blocks = defaultdict(int)
+        self.__lock = threading.Lock()
+        self.to_evict_flag = defaultdict(int)
 
     def flush(self):
         """Flush all dirty blocks to disk
@@ -86,17 +91,46 @@ class BufferPool():
 
         # Remove all items in the queue and pinned/dirty lists
         self.queue.clear()
-        self.pinned_blocks = []
         self.dirty_blocks = []
     
+    def _pin_block(self, key):
+        with self.__lock:
+            self.pinned_blocks[key] += 1
+            
+    def _unpin_block(self, key):
+        with self.__lock:
+            self.pinned_blocks[key] -= 1
+            # we never should go below zero
+            assert self.pinned_blocks[key] >= 0
+            
+            # check if we should evict the block
+            if self.pinned_blocks[key] == 0 and self.to_evict_flag[key]:
+                # reverse eviction if key already in a queue
+                if key not in self.queue:
+                    block = self._get_block(*key)
+                    block.write()   
+                self.to_evict_flag[key] = 0
+                    
+                
+    
+    def _evict_block(self, key, block):
+        with self.__lock:
+            if self.pinned_blocks[key] == 0:
+                block.write()
+            else:
+                self.to_evict_flag[key] = 1
+
     def add_page(self, page, page_num, column_id, tail_flg=0, cache_update=True):
         block_num = page_num // self.block_size
+        key = (self.base_path, column_id, tail_flg, block_num)
+        self._pin_block(key)
         
         # we use the combination of table path, column, tail and block_num as the unique identifier of the block
         block = self._get_block(self.base_path, column_id, tail_flg, block_num)
         
         block.append(page)
         
+        self._unpin_block(key)
         
         if cache_update:
             # we use the combination of table path, column, tail and block_num as the unique identifier of the block
@@ -109,7 +143,9 @@ class BufferPool():
         # If the item is in the BufferPool, just return it
         # and apply the cache policy to the existing item
         block_num = page_num // self.block_size
-
+        key = (self.base_path, column_id, tail_flg, block_num)
+        self._pin_block(key)
+        
         block = self._get_block(self.base_path, column_id, tail_flg, block_num)
         
         order_in_block = page_num % self.block_size
@@ -117,19 +153,23 @@ class BufferPool():
         
         page = block.pages[order_in_block]
         
+        self._unpin_block(key)
         if cache_update:
             # we use the combination of table path, column, tail and block_num as the unique identifier of the block
             self._maintain_cache(self.base_path, column_id, tail_flg, block_num, block)
-            
+        
         return page
         
     def update_page(self, page, page_num, column_id, tail_flg=0, cache_update=True):
         block_num = page_num // self.block_size
+        key = (self.base_path, column_id, tail_flg, block_num)
+        self._pin_block(key)
         block = self._get_block(self.base_path, column_id, tail_flg, block_num)
         
         order_in_block = page_num % self.block_size
         block.pages[order_in_block] = page
         
+        self._unpin_block(key)
         if cache_update:
             # we use the combination of table path, column, tail and block_num as the unique identifier of the block
             self._maintain_cache(self.base_path, column_id, tail_flg, block_num, block)
@@ -154,7 +194,7 @@ class BufferPool():
         result = self.queue.push(key, value)
         # check if the evicted block is dirty and remove it
         if result is not None and (result[1] in self.dirty_blocks):
-            result[2].write()
+            self._evict_block(result[1], result[2])
             self.dirty_blocks.remove(result[1])            
         
 
