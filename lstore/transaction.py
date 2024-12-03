@@ -92,7 +92,7 @@ class Transaction:
 
         #TODO: do roll-back and any other necessary operations
         for wrapper in reversed(self.queries):
-            wrapper.revert()
+            wrapper.roll_back()
 
         # Release all held locks
         self.__release_all()
