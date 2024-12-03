@@ -39,18 +39,23 @@ class QueryWrapper():
         self.transaction = transaction
         self.args = args
         self.lock_manager = self.table.lock_manager
+        self.work_flag = False
 
         # While we could find these values at initialization
         # it requires the index lock, so wait until try_run.
         # Also saves some work.
 
         # In case of delete roll back
+        if self.query_function != Query.insert:
+            self.primary_key = self.args[self.table.primary_key]
+
         if self.query_function == Query.delete:
             self.delete_rid = None
 
         # in case of update roll back
         if self.query_function == Query.update:
             self.update_schema = None
+            self.primary_key = self.args[0]
         # Determine hooks
 
     def try_run(self):
@@ -96,7 +101,12 @@ class QueryWrapper():
             if lock == None:
                 return False
 
-        return self.query_function(*self.args)
+        query_result = self.query_function(*self.args)
+        if not query_result:
+            return None
+        else:
+            self.work_flag = True
+            return query_result
     
     def __find_resources(self, *args):
         """Find resources
@@ -169,7 +179,7 @@ class QueryWrapper():
         
         return resources
 
-    def roll_back(self, primary_key):
+    def roll_back(self):
         """Roll back changes
 
         If the query is one that must
@@ -181,29 +191,31 @@ class QueryWrapper():
         primary_key: int
             primary key of the record changed
         """
-        if self.query_function == Query.delete:
-            # Set deleted row rid back to original rid
-            # WARNING: I don't know if set_column_value will find the location given it's gravestone
-            # however, logically the location should still be able to be found based on how rid is made
-            self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
+        
+        if self.work_flag:
+            if self.query_function == Query.delete:
+                # Set deleted row rid back to original rid
+                # WARNING: I don't know if set_column_value will find the location given it's gravestone
+                # however, logically the location should still be able to be found based on how rid is made
+                self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
 
-        elif self.query_function == Query.insert:
-            # Get rid of new record and set its rid to -1
-            rid = self.table.index.locate(column=self.table.primary_key, value=primary_key)
-            self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
+            elif self.query_function == Query.insert:
+                # Get rid of new record and set its rid to -1
+                rid = self.table.index.locate(column=self.table.primary_key, value=self.primary_key)
+                self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
 
-        elif self.query_function == Query.update:
-            # Get necessary data for roll back
-            rid = self.table.index.locate(column=self.table.primary_key, value = primary_key)
-            ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
-            old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
+            elif self.query_function == Query.update:
+                # Get necessary data for roll back
+                rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)
+                ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
+                old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
 
-            # gravestone tail page
-            self.table.page_directory.set_column_value(ind, Config.rid_column_idx, -1, tail_flg=1)
+                # gravestone tail page
+                self.table.page_directory.set_column_value(ind, Config.rid_column_idx, -1, tail_flg=1)
 
-            # revert old base meta data back to original
-            self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
-            self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
+                # revert old base meta data back to original
+                self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
+                self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
 
 
     def revert(self):
