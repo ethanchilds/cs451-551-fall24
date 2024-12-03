@@ -211,26 +211,3 @@ class QueryWrapper():
                 # revert old base meta data back to original
                 self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
                 self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
-
-
-    def revert(self):
-        """
-        Revert the internal operations of the given
-        query to prevent it from persisting in the
-        database.
-        """
-
-        # TODO: Revert the query using stored internal args/state
-        pass
-
-    def __enter__(self):
-        """
-        When starting up the wrapper function,
-        determine all possible dependencies
-        and establish locks.
-        """
-
-        pass
-
-    def __exit__(self, *args):
-        pass
