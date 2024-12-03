@@ -81,9 +81,11 @@ class TransactionWorker:
 
                 # Record which transactions committed/failed
                 if (result == True):
+                    # Commit condition
                     self.commit_set.add(transaction)
                 elif (result == None):
-                    self.commit_set.add(transaction)
+                    # Failure condition
+                    self.fail_set.add(transaction)
             
             # stores the number of transactions that committed
             self.result += len(list(filter(lambda x: x, self.stats)))
