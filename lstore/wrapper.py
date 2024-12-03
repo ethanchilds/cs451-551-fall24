@@ -185,11 +185,6 @@ class QueryWrapper():
         If the query is one that must
         be reverted if transaction
         aborts, roll back changes.
-
-        Parameters
-        ----------
-        primary_key: int
-            primary key of the record changed
         """
         
         if self.work_flag:
