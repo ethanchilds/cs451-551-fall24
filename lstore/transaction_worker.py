@@ -6,7 +6,7 @@ from lstore.table import Table, Record
 from lstore.index import Index
 
 class TransactionWorker:
-    def __init__(self, transactions = []):
+    def __init__(self, transactions = None):
         """
         Creates a transaction worker object.
 
@@ -18,7 +18,7 @@ class TransactionWorker:
 
         # Internal variables
         self.stats = []  # Which transactions failed and which succeeded
-        self.transactions = transactions
+        self.transactions = [] if (transactions is None) else transactions
         self.result = 0
         self.commit_set = set()  # A set of successful Transaction objects
         self.fail_set = set()  # A set of failed Transaction objects (errored)
@@ -92,8 +92,10 @@ class TransactionWorker:
 
             # Remove all elements which committed successfully or failed with an error
             for t in self.commit_set:
-                self.transactions.remove(t)
+                if (t in self.transactions):
+                    self.transactions.remove(t)
             self.commit_set = set()
             for t in self.fail_set:
-                self.transactions.remove(t)
+                if (t in self.transactions):
+                    self.transactions.remove(t)
             self.fail_set = set()

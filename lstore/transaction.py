@@ -124,6 +124,3 @@ class Transaction:
         # Loop through all lock managers
         for manager in self.lock_managers:
             manager.release_all(self)
-
-        # Clear the lock managers
-        self.lock_managers.clear()
