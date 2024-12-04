@@ -46,7 +46,7 @@ class QueryWrapper():
         # Also saves some work.
 
         # In case of delete roll back
-        if self.query_function != Query.insert:
+        if self.query_function == Query.insert:
             self.primary_key = self.args[self.table.primary_key]
 
         if self.query_function == Query.delete:
