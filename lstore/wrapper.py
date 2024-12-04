@@ -37,6 +37,7 @@ class QueryWrapper():
         self.table = table
         self.index = self.table.index
         self.query_function = query_function
+        self.query_function_type = query_function.__func__
         self.transaction = transaction
         self.args = args
         self.lock_manager = self.table.lock_manager
@@ -47,14 +48,14 @@ class QueryWrapper():
         # Also saves some work.
 
         # In case of delete roll back
-        if self.query_function == Query.insert:
+        if self.query_function_type == Query.insert:
             self.primary_key = self.args[self.table.primary_key]
 
-        if self.query_function == Query.delete:
+        if self.query_function_type == Query.delete:
             self.delete_rid = None
 
         # in case of update roll back
-        if self.query_function == Query.update:
+        if self.query_function_type == Query.update:
             self.update_schema = None
             self.primary_key = self.args[0]
         # Determine hooks
@@ -88,11 +89,11 @@ class QueryWrapper():
             return False
 
         # Update the query rid
-        if self.query_function == Query.delete:
-            self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
+        if self.query_function_type == Query.delete:
+            self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
         # update the query schema
-        elif self.query_function == Query.update:
-            rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
+        elif self.query_function_type == Query.update:
+            rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
             self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, )
 
         for i in range(1, len(resources)):
@@ -129,17 +130,14 @@ class QueryWrapper():
 
         # Store a list of resources
         resources = []
-
-        # Resolve to the unbounded method for comparison
-        func = self.query_function.__func__
         
         # Compare which function to use
-        if func == Query.delete:
+        if self.query_function_type == Query.delete:
             # Write only that affects only one column
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             resources.append((Config.EXCLUSIVE_LOCK, (args[0], Config.rid_column_idx), self.transaction))
 
-        elif func == Query.insert:
+        elif self.query_function_type == Query.insert:
             primary = args[self.table.primary_key]
 
             # Write only on all columns
@@ -147,7 +145,7 @@ class QueryWrapper():
             for i in range(len(args) + Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif func == Query.update:
+        elif self.query_function_type == Query.update:
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
@@ -160,7 +158,7 @@ class QueryWrapper():
             for i in range(len(columns)+Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif func == Query.select or func == Query.select_version:
+        elif self.query_function_type == Query.select or self.query_function_type == Query.select_version:
             project_columns = args[2]
             primary = args[0]
 
@@ -170,7 +168,7 @@ class QueryWrapper():
                 if project_columns[i]:
                     resources.append((Config.SHARED_LOCK, (primary, i+Config.column_data_offset), self.transaction))
 
-        elif func == Query.sum or func == Query.sum_version:
+        elif self.query_function_type == Query.sum or self.query_function_type == Query.sum_version:
             # read only on just the primary key column
             # WARNING: sum may function on a range that includes the final value
             # If so, must change range to (args[0], args[1]+1)
@@ -186,10 +184,10 @@ class QueryWrapper():
         If the query is one that must
         be reverted if transaction
         aborts, roll back changes.
-        """
-        
+        """        
         if self.work_flag:
-            if self.query_function == Query.delete:
+
+            if self.query_function_type == Query.delete:
                 # Set deleted row rid back to original rid
                 # WARNING: I don't know if set_column_value will find the location given it's gravestone
                 # however, logically the location should still be able to be found based on how rid is made
@@ -201,15 +199,16 @@ class QueryWrapper():
                     record[column] = self.table.page_directory.get_data_attribute(self.delete_rid, column)
                 self.index.maintain_insert(record, self.delete_rid)
 
-            elif self.query_function == Query.insert:
+            elif self.query_function_type == Query.insert:
                 # Get rid of new record and set its rid to -1
-                rid = self.table.index.locate(column=self.table.primary_key, value=self.primary_key)
+                rid = self.table.index.locate(column=self.table.primary_key, value=self.primary_key)[0]
+
                 self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
                 self.index.maintain_delete(rid)
 
-            elif self.query_function == Query.update:
+            elif self.query_function_type == Query.update:
                 # Get necessary data for roll back
-                rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)
+                rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)[0]
 
                 num_columns = self.table.num_columns
                 record = [None] * num_columns

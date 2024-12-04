@@ -329,18 +329,38 @@ class TestTransactionUndo(unittest.TestCase):
         if (os.path.exists(db_path)):
             shutil.rmtree(db_path, ignore_errors=True)
 
+    def run_txn_but_dont_commit(self, transaction):
+        for wrapper in transaction.queries:
+            result = wrapper.try_run()
+            self.assertTrue(result)
+
     def test_one_insert(self):
         self.txn.add_query(self.query.insert, self.table, *[123, 0, 321])
-        self.txn_worker.add_transaction(self.txn)
-        
-        self.txn_worker.run()
-        self.txn_worker.join()
 
-        print()
-        print(self.table.str_physical())
-        # self.txn.abort()
-        # print()
-        # print(self.table.str_physical())
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+        self.txn.abort()
+        self.assertEqual(self.index.column_items(1), [])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+
+    def test_one_update(self):
+        self.query.insert(*[123, 0, 321])
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, 1, 404]])
+        
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(1, 0)])
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 1)
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 0)
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+
         
         
 # class TestLstoreIndexUndo(unittest.TestCase):

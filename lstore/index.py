@@ -139,6 +139,9 @@ class Index:
 
             self.indices[column].insert(attribute, rid)
 
+        if self.debug_mode:
+            print("index notified of insert") 
+
     def maintain_update(self, rid, new_tuple):
         """
         rid is assumed to be valid
@@ -150,7 +153,10 @@ class Index:
                 continue
 
             old_attribute = self.table.page_directory.get_data_attribute(rid, column)
-            index.update(old_attribute, new_attribute, rid)        
+            index.update(old_attribute, new_attribute, rid)  
+
+        if self.debug_mode:
+            print("index notified of update")      
     
     def maintain_delete(self, rid):
         """
@@ -161,6 +167,9 @@ class Index:
             if index:
                 attribute = self.table.page_directory.get_data_attribute(rid, column)
                 index.remove(attribute, rid)
+
+        if self.debug_mode:
+            print("index notified of delete") 
     
     def _consider_new_index(self, column):
         if self.automatic_new_indexes == False:
@@ -173,7 +182,17 @@ class Index:
             if self.debug_mode:
                 print(f"AUTOMATICALLY CREATING INDEX ON COLUMN {column}")
             self.create_index(column, ordered=True, unique_keys=False)
-            
+
+    def column_items(self, column):
+        index_on_column = self.indices[column]
+        if index_on_column is None:
+            return []
+        
+        return list(index_on_column.items())
+
+    def column_str(self, column):
+        return str(self.column_items(column))
+
 
 import unittest
 from random import shuffle
