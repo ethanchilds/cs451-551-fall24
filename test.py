@@ -4,10 +4,13 @@ import unittest
 import os
 import shutil
 import random
+import sys
 
 # Local Imports
 from lstore.db import Database
 from lstore.query import Query
+from lstore.transaction import Transaction
+from lstore.transaction_worker import TransactionWorker
 from config import Config
 import errors
 
@@ -312,6 +315,34 @@ class TestLstoreIndex(unittest.TestCase):
 
         self.assertFalse(self.query.update(0, *[1, None, None, None]))
 
+class TestTransactionUndo(unittest.TestCase):
+    def setUp(self):
+        self.database = Database()
+        self.table = self.database.create_table("Txn Undo Test", 3, 1)
+        self.index = self.table.index
+        self.query = Query(self.table)
+        self.txn = Transaction()
+        self.txn_worker = TransactionWorker([self.txn])
+    
+    def tearDown(self):
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
+
+    def test_one_insert(self):
+        self.txn.add_query(self.query.insert, self.table, *[123, 0, 321])
+        self.txn_worker.add_transaction(self.txn)
+        
+        self.txn_worker.run()
+        self.txn_worker.join()
+
+        print()
+        print(self.table.str_physical())
+        # self.txn.abort()
+        # print()
+        # print(self.table.str_physical())
+        
+        
 # class TestLstoreIndexUndo(unittest.TestCase):
 #     def setUp(self):
 #         self.database = Database()
@@ -543,5 +574,11 @@ class UltimateLstoreTest(unittest.TestCase):
     
 
 if __name__ == '__main__':
-    unittest.main()
+    if len(sys.argv) > 1:
+        tests_to_run = sys.argv[1:]
+        sys.argv = [sys.argv[0]]
+        suite = unittest.TestLoader().loadTestsFromNames(tests_to_run)
+        unittest.TextTestRunner().run(suite)
+    else:
+        unittest.main()
 

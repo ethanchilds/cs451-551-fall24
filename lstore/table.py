@@ -495,6 +495,11 @@ class Table:
         result += self._str_tuple(column_widths, column_names) + "\n"
         result += self._str_horizontal_line(widths=column_widths) + "\n"
 
+        if len(base_page_data) == 0 and len(tail_page_data) == 0:
+            result += self._str_message(widths=column_widths, message="EMPTY TABLE :(") + "\n"
+            result += self._str_horizontal_line(widths=column_widths)
+            return result
+
         for values in base_page_data:
             result += self._str_tuple(column_widths, values) + "\n"
         if base_clipped:
@@ -536,6 +541,15 @@ class Table:
     def _str_dots(self, widths):
         dots = ["."*min(width-2, 3) for width in widths]
         return self._str_tuple(widths, dots)
+    
+    def _str_message(self, widths, message):
+        total_width = sum(widths) + (len(widths) - 1)
+        left_padding = 1
+        right_padding = total_width - left_padding - len(message)
+        assert right_padding >= 1
+        result = "|" + (" "*left_padding) + message + (" "*right_padding) + "|"
+        return result
+
 
     def column_iterator(self, column):
         """Iterate through all values in a column
