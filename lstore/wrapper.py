@@ -35,6 +35,7 @@ class QueryWrapper():
         
         # Set up internal variables
         self.table = table
+        self.index = self.table.index
         self.query_function = query_function
         self.transaction = transaction
         self.args = args
@@ -193,15 +194,28 @@ class QueryWrapper():
                 # WARNING: I don't know if set_column_value will find the location given it's gravestone
                 # however, logically the location should still be able to be found based on how rid is made
                 self.table.page_directory.set_column_value(self.delete_rid, Config.rid_column_idx, self.delete_rid)
+                
+                num_columns = self.table.num_columns
+                record = [None] * num_columns
+                for column in range(num_columns):
+                    record[column] = self.table.page_directory.get_data_attribute(self.delete_rid, column)
+                self.index.maintain_insert(record, self.delete_rid)
 
             elif self.query_function == Query.insert:
                 # Get rid of new record and set its rid to -1
                 rid = self.table.index.locate(column=self.table.primary_key, value=self.primary_key)
                 self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
+                self.index.maintain_delete(rid)
 
             elif self.query_function == Query.update:
                 # Get necessary data for roll back
                 rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)
+
+                num_columns = self.table.num_columns
+                record = [None] * num_columns
+                for column in range(num_columns):
+                    record[column] = self.table.page_directory.get_data_attribute(self.delete_rid, column)
+
                 ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
                 old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
 
@@ -211,3 +225,6 @@ class QueryWrapper():
                 # revert old base meta data back to original
                 self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
                 self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
+
+                self.index.maintiain_update(rid, record)
+
