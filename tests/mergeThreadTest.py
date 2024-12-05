@@ -3,19 +3,25 @@ from lstore.query import Query
 import unittest
 import random
 import time
+import os
+import shutil
 from config import Config
 
-class TestLstroreDB(unittest.TestCase):
+class TestMergeThread(unittest.TestCase):
 
     def setUp(self):
         self.db = Database()
-        self.test_table = self.db.create_table('Test', 5, 0, False)
+        self.test_table = self.db.create_table('Test', 5, 0, False, merge_interval=0.5)
         self.query = Query(self.test_table)  
 
     def tearDown(self):
         self.db = None
         self.test_table = None
         self.query = None 
+
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
 
     def test_merge_page_thread(self):
         self.query.insert(*[0]*5)
