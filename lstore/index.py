@@ -184,6 +184,10 @@ class Index:
             self.create_index(column, ordered=True, unique_keys=False)
 
     def column_items(self, column):
+        """
+        returns a list of attribute-rid pairs stored for a column.
+        columns without an index don't store any items and therefore return an empty list.
+        """
         index_on_column = self.indices[column]
         if index_on_column is None:
             return []

@@ -57,7 +57,13 @@ class QueryWrapper():
         # in case of update roll back
         if self.query_function_type == Query.update:
             self.update_schema = None
-            self.primary_key = self.args[0]
+            primary_key_location_in_args = self.table.primary_key + 1
+            if self.args[primary_key_location_in_args] is None:
+                self.primary_key = self.args[0]
+            else:
+                self.primary_key = self.args[primary_key_location_in_args]
+            self.delete_rid = None
+            self.old_record = [None] * self.table.num_columns
         # Determine hooks
 
     def try_run(self):
@@ -91,10 +97,15 @@ class QueryWrapper():
         # Update the query rid
         if self.query_function_type == Query.delete:
             self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
+
         # update the query schema
         elif self.query_function_type == Query.update:
             rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
+            self.delete_rid = rid
             self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, )
+
+            for column in range(self.table.num_columns):
+                self.old_record[column] = self.table.page_directory.get_data_attribute(rid, column)
 
         for i in range(1, len(resources)):
             lock_type, unique_id, transaction = resources[i]
@@ -206,17 +217,15 @@ class QueryWrapper():
                 self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
                 self.index.maintain_delete(rid)
 
-            elif self.query_function_type == Query.update:
+            elif self.query_function_type == Query.update:                
                 # Get necessary data for roll back
                 rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)[0]
 
-                num_columns = self.table.num_columns
-                record = [None] * num_columns
-                for column in range(num_columns):
-                    record[column] = self.table.page_directory.get_data_attribute(self.delete_rid, column)
-
                 ind = self.table.page_directory.get_column_value(rid, Config.indirection_column_idx)
                 old_ind = self.table.page_directory.get_column_value(ind, Config.indirection_column_idx, tail_flg=1)
+
+                # Update the index
+                self.index.maintain_update(rid, self.old_record)
 
                 # gravestone tail page
                 self.table.page_directory.set_column_value(ind, Config.rid_column_idx, -1, tail_flg=1)
@@ -224,6 +233,4 @@ class QueryWrapper():
                 # revert old base meta data back to original
                 self.table.page_directory.set_column_value(rid, Config.schema_encoding_column_idx, self.update_schema)
                 self.table.page_directory.set_column_value(rid, Config.indirection_column_idx, old_ind)
-
-                self.index.maintiain_update(rid, record)
 
