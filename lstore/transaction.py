@@ -102,7 +102,7 @@ class Transaction:
         self.__release_all()
 
         # Force a context switch
-        time.sleep(0)
+        time.sleep(1e-4)
 
         return (False if not failure else None)
 
