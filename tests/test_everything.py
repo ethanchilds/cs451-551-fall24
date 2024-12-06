@@ -329,18 +329,223 @@ class TestTransactionUndo(unittest.TestCase):
         if (os.path.exists(db_path)):
             shutil.rmtree(db_path, ignore_errors=True)
 
+    def run_txn_but_dont_commit(self, transaction):
+        for wrapper in transaction.queries:
+            result = wrapper.try_run()
+            self.assertTrue(result)
+
+    def test_abort_with_no_operations(self):
+        self.query.insert(*[111, 0, 111])
+
+        # Aborting an empty transaction should leave the database unchanged
+        self.run_txn_but_dont_commit(self.txn)
+        self.txn.abort()
+
+        self.assertEqual(len(self.index.column_items(1)), 1)
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+
     def test_one_insert(self):
         self.txn.add_query(self.query.insert, self.table, *[123, 0, 321])
-        self.txn_worker.add_transaction(self.txn)
+
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+        self.txn.abort()
+        self.assertEqual(self.index.column_items(1), [])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+
+    def test_one_delete(self):
+        self.query.insert(*[123, 0, 321])
+        self.txn.add_query(self.query.delete, self.table, *[0])
         
-        self.txn_worker.run()
-        self.txn_worker.join()
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+
+    def test_one_update_normal(self):
+        self.query.insert(*[123, 0, 321])
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, 1, 404]])
+        
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(1, 0)])
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 1)
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 0)
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+
+    def test_one_update_no_pk_change(self):
+        self.query.insert(*[123, 0, 321])
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, None, 404]])
+        
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 1)
+
+    def test_one_update_no_changes(self):
+        self.assertTrue(self.query.insert(0, 0, 0))
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, None, None]])
+
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertTrue(len(self.query.select(0, 1, [True, True, True])), 1)
+
+        self.txn.abort()
+
+        self.assertTrue(len(self.query.select(0, 1, [True, True, True])), 1)
+
+    def test_one_update_with_secondary_index(self):
+        self.index.create_index(0)
+        self.assertTrue(self.query.insert(*[123, 0, 321]))
+        self.txn.add_query(self.query.update, self.table, *[0, *[200, 1, 404]])
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.query.select(200, 0, [True]*3)[0].columns, [200, 1, 404])
+        self.assertEqual(len(self.query.select(123, 0, [True]*3)), 0)
+        self.assertEqual(self.index.column_items(0), [(200, 0)])
+        
+        self.txn.abort()
+
+        self.assertEqual(self.query.select(123, 0, [True]*3)[0].columns, [123, 0, 321])
+        self.assertEqual(len(self.query.select(200, 0, [True]*3)), 0)
+        self.assertEqual(self.index.column_items(0), [(123, 0)])
+
+    def test_bad_insert(self):
+        self.query.insert(*[0, 0, 0])
+
+        self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
+        self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
+        self.txn.add_query(self.query.insert, self.table, *[0, 2, 0]) # PK already exists
+        self.assertFalse(self.txn.run())
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+
+    def test_bad_delete(self):
+        self.query.insert(*[0, 0, 0])
+
+        self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
+        self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
+        self.txn.add_query(self.query.delete, self.table, *[1]) # pk doesn't exist
+        self.assertFalse(self.txn.run())
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
 
         print()
         print(self.table.str_physical())
-        # self.txn.abort()
-        # print()
-        # print(self.table.str_physical())
+        print()
+        print(self.table)
+
+    def test_bad_update(self):
+        self.query.insert(*[0, 0, 0])
+
+        self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
+        self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
+        self.txn.add_query(self.query.update, self.table, *[0, *[2, 2, 2]]) # breaks unique pk contraint
+        self.assertFalse(self.txn.run())
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+
+    def test_two_inserts(self):
+        self.txn.add_query(self.query.insert, self.table, *[111, 0, 222])
+        self.txn.add_query(self.query.insert, self.table, *[123, 1, 456])
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(0, 0), (1, 1)])
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [])
+        self.assertEqual(len(list(self.table.column_iterator(1))), 0)
+
+    def test_two_updates(self):
+        self.query.insert(*[0, 0, 0])
+        self.query.update(0, *[1, None, None])
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, 1, None]])
+        self.txn.add_query(self.query.update, self.table, *[1, *[None, None, 1]])
+        self.run_txn_but_dont_commit(self.txn)
+
+        print()
+        self.assertEqual(self.index.column_items(1), [(1, 0)])
+        self.assertEqual(list(self.table.column_iterator(1)), [(1, 0)])
+        self.assertEqual(list(self.table.column_iterator(0)), [(1, 0)])
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
+        self.assertEqual(list(self.table.column_iterator(0)), [(1, 0)])
+
+    def test_two_deletes(self):
+        self.query.insert(*[0, 0, 0])
+        self.query.insert(*[1, 1, 1])
+        self.txn.add_query(self.query.delete, self.table, *[0])
+        self.txn.add_query(self.query.delete, self.table, *[1])
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(list(self.table.column_iterator(1)), [])
+        self.assertEqual(self.index.column_items(1), [])
+
+        self.txn.abort()
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0), (1, 1)])
+        self.assertEqual(self.index.column_items(1), [(0, 0), (1, 1)])
+        
+
+    def test_delete_insert(self):
+        self.query.insert(*[0, 0, 0])
+        self.txn.add_query(self.query.delete, self.table, *[0])
+        self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(1, 1)])
+        self.assertEqual(self.index.column_items(1), [(1, 1)])
+
+        self.txn.abort()
+
+        self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
+        self.assertEqual(self.index.column_items(1), [(0, 0)])
+
+    def test_insert_insert_update_delete(self):
+        self.txn.add_query(self.query.insert, self.table, *[111, 0, 222])
+        self.txn.add_query(self.query.insert, self.table, *[123, 1, 456])
+        
+        # Update one row and delete the other
+        self.txn.add_query(self.query.update, self.table, *[0, *[None, 2, 999]])
+        self.txn.add_query(self.query.delete, self.table, *[1])
+        
+        self.run_txn_but_dont_commit(self.txn)
+
+        self.assertEqual(self.index.column_items(1), [(2, 0)])
+        self.assertEqual(len(self.query.select(2, 1, [True]*3)), 1)
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 0)
+
+        self.txn.abort()
+
+        self.assertEqual(self.index.column_items(1), [])
+        self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
+        self.assertEqual(len(self.query.select(1, 1, [True]*3)), 0)
+        
+        
         
         
 # class TestLstoreIndexUndo(unittest.TestCase):
@@ -516,7 +721,7 @@ class UltimateLstoreTest(unittest.TestCase):
         # delete row with pk: 10, make sure it isn't still there, make sure the secondary index updated.
         attribute_col_1 = self.query.select(10, 0, [False, True, False])[0].columns[0]
         amount_of_tuples_with_attribute = len(self.query.select(attribute_col_1, 1, [True, True, True]))
-        self.assertTrue(self.query.delete(10) is None)
+        self.assertTrue(self.query.delete(10))
         self.assertFalse(self.query.delete(10))
         self.assertEqual(len(self.query.select(attribute_col_1, 1, [True, True, True])), amount_of_tuples_with_attribute - 1) # Secondary index should be updated
         self.assertTrue(self.query.update(9, *[10, 123_456, 101_010]))
@@ -526,7 +731,7 @@ class UltimateLstoreTest(unittest.TestCase):
         primary_keys = [value for value, rid in list(self.table.column_iterator(0))]
 
         for pk in primary_keys:
-            self.assertTrue(self.query.delete(pk) is None)
+            self.assertTrue(self.query.delete(pk))
 
         number_of_records = len(list(self.table.column_iterator(0)))
         self.assertEqual(number_of_records, 0)
@@ -581,4 +786,3 @@ if __name__ == '__main__':
         unittest.TextTestRunner().run(suite)
     else:
         unittest.main()
-
