@@ -396,15 +396,15 @@ class Table:
 
         # Data
         #s += "|"
+        num_logical_records = 0
         for r in range(self.page_directory.num_records):
             s += "|"
             for c in range(self.num_columns):
-                # rid = self.page_directory.get_column_value(r, Config.rid_column_idx)
-                # if (rid != -1):
-                #     v = self.page_directory.get_column_value(rid, c+Config.column_data_offset)
-                #     s += f"{v: {nsp}}|"
-                v = self.page_directory.get_data_attribute(r, c)
-                s += f"{v: {nsp}}|"
+                rid = self.page_directory.get_column_value(r, Config.rid_column_idx)
+                if (rid != -1):
+                    v = self.page_directory.get_data_attribute(r, c)
+                    s += f"{v: {nsp}}|"
+                    num_logical_records += 1
             s += "\n"
 
         # Bottom Bar
