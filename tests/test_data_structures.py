@@ -1,7 +1,7 @@
 from data_structures.b_plus_tree import BPlusTree
 from data_structures.hash_map import HashMap
 from data_structures.ordered_dict import OD
-from bintrees import *
+#from bintrees import *
 from utilities.timer import timer
 from random import *
 
@@ -9,12 +9,12 @@ import unittest
 # from test import TestLstoreIndexUndo
 from utilities.latch import TestLatch
 unittest.main()
-from test import UltimateLstoreTest
+from tests.test_everything import UltimateLstoreTest
 from lstore.index import TestIndexDataStructures
 from data_structures.b_plus_tree import TestBPlusTree
-from test import TestLstoreDB
-from test import TestLstoreIndex
-from test import UltimateLstoreTest
+from tests.test_everything import TestLstoreDB
+from tests.test_everything import TestLstoreIndex
+from tests.test_everything import UltimateLstoreTest
 from lstore.table import Table
 
 def test_data_structure_correctness(DataStructure, operations):

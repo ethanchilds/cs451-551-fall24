@@ -234,7 +234,7 @@ class Table:
     for individual records to be retrieved by value.
     """
 
-    def __init__(self, db_path, name, num_columns=None, primary_key=None, force_merge = True):
+    def __init__(self, db_path, name, num_columns=None, primary_key=None, force_merge = True, merge_interval=30):
         """Initialize a Table
 
         Parameters
@@ -297,7 +297,7 @@ class Table:
 
         if self.force_merge == False:
             # Only adjust interval and num tails to merge
-            self.interval = 30
+            self.interval = merge_interval
             self.num_tails_to_merge = 1
 
             # DO NOT TOUCH
