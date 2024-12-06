@@ -398,10 +398,12 @@ class Table:
         #s += "|"
         num_logical_records = 0
         for r in range(self.page_directory.num_records):
+            rid = self.page_directory.get_column_value(r, Config.rid_column_idx)
+            if (rid == -1):
+                continue
+
             s += "|"
             for c in range(self.num_columns):
-                rid = self.page_directory.get_column_value(r, Config.rid_column_idx)
-                if (rid != -1):
                     v = self.page_directory.get_data_attribute(r, c)
                     s += f"{v: {nsp}}|"
                     num_logical_records += 1
