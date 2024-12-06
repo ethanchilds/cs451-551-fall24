@@ -101,6 +101,32 @@ else
 fi
 
 echo "===================================ASSIGNMENT 3 TESTS================================================="
+
+FOLDER="./CS451"
+if [ -d "$FOLDER" ]; then
+    rm -rf "$FOLDER"
+    echo "Folder '$FOLDER' has been deleted."
+else
+    echo "Folder '$FOLDER' does not exist."
+fi
+
+# Run the first Python file
+echo "Running m3_tester_part_1.py"
+python3 m3_tester_part_1.py
+
+# Run the second Python file
+echo "Running m3_tester_part_2.py"
+python3 m3_tester_part_2.py
+
+
+# Check if the folder exists, then delete it
+if [ -d "$FOLDER" ]; then
+    rm -rf "$FOLDER"
+    echo "Folder '$FOLDER' has been deleted."
+else
+    echo "Folder '$FOLDER' does not exist."
+fi
+
 FOLDER="./CS451"
 if [ -d "$FOLDER" ]; then
     rm -rf "$FOLDER"
