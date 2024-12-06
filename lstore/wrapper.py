@@ -96,7 +96,10 @@ class QueryWrapper():
 
         # Update the query rid
         if self.query_function_type == Query.delete:
-            self.delete_rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
+            rids = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
+            if len(rids) != 1:
+                return None
+            self.delete_rid = rids[0]
 
         # update the query schema
         elif self.query_function_type == Query.update:
