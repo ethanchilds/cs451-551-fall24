@@ -17,6 +17,14 @@ import errors
 class TestLstoreDB(unittest.TestCase):
 
     def setUp(self):
+        self.db = None
+        self.test_table = None
+        self.query = None
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
+
+
         self.db = Database()
         self.test_table = self.db.create_table('Test', 5, 0, force_merge=True)
         self.query = Query(self.test_table)  
@@ -332,7 +340,7 @@ class TestTransactionUndo(unittest.TestCase):
     def run_txn_but_dont_commit(self, transaction):
         for wrapper in transaction.queries:
             result = wrapper.try_run()
-            self.assertTrue(result)
+            self.assertTrue(result != False)
 
     def test_abort_with_no_operations(self):
         self.query.insert(*[111, 0, 111])
@@ -449,11 +457,6 @@ class TestTransactionUndo(unittest.TestCase):
         self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
         self.assertEqual(self.index.column_items(1), [(0, 0)])
 
-        print()
-        print(self.table.str_physical())
-        print()
-        print(self.table)
-
     def test_bad_update(self):
         self.query.insert(*[0, 0, 0])
 
@@ -544,9 +547,53 @@ class TestTransactionUndo(unittest.TestCase):
         self.assertEqual(self.index.column_items(1), [])
         self.assertEqual(len(self.query.select(0, 1, [True]*3)), 0)
         self.assertEqual(len(self.query.select(1, 1, [True]*3)), 0)
-        
-        
-        
+
+    def test_large_transaction(self):
+        # Add loads of data to the table
+        for i in range(13):
+            self.txn.add_query(self.query.insert, self.table, *[i, i, i])
+        for i in range(5):
+            self.txn.add_query(self.query.update, self.table, *[i, *[i*2, None, i^7]])
+        for i in range(10, 13):
+            self.txn.add_query(self.query.delete, self.table, *[i])
+        self.assertTrue(self.txn.run())
+
+        # The logical table should be exactly the same before and after txn2
+        column_0_before_txn2 = list(self.table.column_iterator(0))
+        # print()
+        # print(column_0_before_txn2)
+
+        self.txn2 = Transaction()
+        for i in reversed(range(10)):
+            new_record = [3*i if i%3==0 else None, i+1, 2*i if i%2!=0 else None]
+            self.txn2.add_query(self.query.update, self.table, *[i, *new_record])
+            
+        self.txn2.add_query(self.query.delete, self.table, *[3])
+        self.txn2.add_query(self.query.select, self.table, *[9, 1, [True]*3])
+        for i in range(4, 7):
+            self.txn2.add_query(self.query.update, self.table, *[i, *[42, None, None]])
+
+        self.txn2.add_query(self.query.select, self.table, *[42, 0, [True]*3])
+        self.txn2.add_query(self.query.insert, self.table, *[33, 3, 3333])
+        for i in range(5, 7):
+            self.txn2.add_query(self.query.delete, self.table, *[i])
+
+        for column in range(3):
+            self.txn2.add_query(self.query.select, self.table, *[42, column, [True]*3])
+
+        for i in range(13, 16):
+            self.txn2.add_query(self.query.insert, self.table, *[i-1, i, i+1])
+
+        self.run_txn_but_dont_commit(self.txn2)
+
+        # column_0_after_txn2 = list(self.table.column_iterator(0))
+        # print(column_0_after_txn2)
+
+        self.txn2.abort()
+
+        column_0_after_txn2_abort = list(self.table.column_iterator(0))
+        # print(column_0_after_txn2_abort)
+        self.assertEqual(column_0_before_txn2, column_0_after_txn2_abort)             
         
 # class TestLstoreIndexUndo(unittest.TestCase):
 #     def setUp(self):

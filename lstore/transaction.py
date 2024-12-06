@@ -58,7 +58,7 @@ class Transaction:
             Whether or not the transaction was successful
             False will be returned on abort
         """
-
+        pass
         # Loop through all queries
         for wrapper in self.queries:
             # Try to run the wrapped query

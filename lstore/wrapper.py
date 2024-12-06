@@ -103,7 +103,10 @@ class QueryWrapper():
 
         # update the query schema
         elif self.query_function_type == Query.update:
-            rid = self.table.index.locate(column=self.table.primary_key, value=self.args[0])[0]
+            rids = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
+            if len(rids) != 1:
+                return None
+            rid = rids[0]
             self.delete_rid = rid
             self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, )
 
@@ -118,11 +121,11 @@ class QueryWrapper():
                 return False
 
         query_result = self.query_function(*self.args)
-        if not query_result:
+        if query_result == False:
             return None
         else:
             self.work_flag = True
-            return query_result
+            return query_result != False
     
     def __find_resources(self, *args):
         """Find resources
