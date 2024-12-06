@@ -121,13 +121,6 @@ class QueryWrapper():
             for column in range(self.table.num_columns):
                 self.old_record[column] = self.table.page_directory.get_data_attribute(rid, column)
 
-        for i in range(1, len(resources)):
-            lock_type, unique_id, transaction = resources[i]
-            lock = self.table.lock_manager.request(lock_type, unique_id, transaction)
-        
-            if lock == None:
-                return False
-
         query_result = self.query_function(*self.args)
         if query_result == False:
             return None
