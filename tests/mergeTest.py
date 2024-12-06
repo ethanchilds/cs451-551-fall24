@@ -2,19 +2,24 @@ from lstore.db import Database
 from lstore.query import Query
 import unittest
 import random
+import os
+import shutil
 from config import Config
 
-class TestLstroreDB(unittest.TestCase):
+class TestMerge(unittest.TestCase):
 
     def setUp(self):
         self.db = Database()
-        self.test_table = self.db.create_table('Test', 5, 0)
+        self.test_table = self.db.create_table('Test', 5, 0, merge_interval=0.5)
         self.query = Query(self.test_table)  
 
     def tearDown(self):
         self.db = None
         self.test_table = None
-        self.query = None 
+        self.query = None
+        db_path = './TEMP'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
 
     def test_one_record_no_update_merge(self):
         self.query.insert(*[1]*5)

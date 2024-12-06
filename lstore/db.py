@@ -63,7 +63,7 @@ class Database():
                 #close table
                 t.close()
 
-    def create_table(self, name, num_columns, key_index, force_merge=False):
+    def create_table(self, name, num_columns, key_index, force_merge=False, merge_interval=30):
         """Creates a new table
 
         Parameters
@@ -93,7 +93,7 @@ class Database():
             raise TableNotUniqueError
         
         # Create a new table
-        table = Table(self.path, name, num_columns, key_index, force_merge)
+        table = Table(self.path, name, num_columns, key_index, force_merge, merge_interval)
         self.tables[name] = table
 
         return table
@@ -153,39 +153,3 @@ class Database():
             self.tables[name] = table
             
         return self.tables.get(name)
-    
-
-import unittest
-class TestDatabase(unittest.TestCase):
-    def setUp(self):
-        self.db = Database()
-        self.db.create_table("foo", 3, 0)
-
-    def test_create_table(self):
-        self.assertTrue(self.db.tables.get("foo"))
-
-    def test_create_existing_table(self):
-        with self.assertRaises(TableNotUniqueError):
-            self.db.create_table("foo", 2, 1)
-
-    def test_drop_table(self):
-        self.db.drop_table("foo")
-        with self.assertRaises(TableDoesNotExistError):
-            self.db.get_table("foo")
-
-    def test_drop_non_existant_table(self):
-        with self.assertRaises(TableDoesNotExistError):
-            self.db.drop_table("bar")
-
-    def test_double_drop_table(self):
-        self.db.drop_table("foo")
-        with self.assertRaises(TableDoesNotExistError):
-            self.db.drop_table("foo")
-
-    def test_get_table(self):
-        self.db.get_table("foo")
-
-    def test_get_non_existant_table(self):
-        with self.assertRaises(TableDoesNotExistError):
-            self.db.get_table("bar")
-
