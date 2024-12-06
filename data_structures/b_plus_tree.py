@@ -88,7 +88,7 @@ class Node:
 
         return True
     
-    def __str__(self):
+    def __repr__(self):
         if self.is_leaf:
             node_type = "Leaf"
         elif self.parent:
@@ -839,7 +839,7 @@ class BPlusTree:
 
         return True
     
-    def __str__(self):
+    def __repr__(self):
         if not self.root:
             return "Empty B+ Tree"
         
@@ -863,6 +863,9 @@ class BPlusTree:
                 queue.extend((child, depth + 1) for child in current_node.values)
 
         return '\n'.join(result) 
+    
+    def __str__(self):
+        return f"{list(self.items())}"
 
     def reset(self):
         self.root = Node(minimum_degree=Config.b_plus_tree_minimum_degree, is_leaf=True)

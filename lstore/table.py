@@ -44,6 +44,9 @@ class Record:
     
     def __str__(self):
         return str(self.columns)
+    
+    def __repr__(self):
+        return str(self.columns)
 
 class PageDirectory:
     """The PageDirectory controls access to different pages
@@ -197,6 +200,7 @@ class PageDirectory:
             page = self.bufferpool.get_page(page_num, column_id, tail_flg=1, cache_update=cache_update)
             page.write_at_location(new_value, order_in_page)
             self.bufferpool.update_page(page, page_num, column_id, tail_flg=1, cache_update=cache_update)
+        return True
 
 '''
   def get_page_copy(self, column, page_idx, tail_flg = 0):
@@ -392,13 +396,15 @@ class Table:
 
         # Data
         #s += "|"
+        num_logical_records = 0
         for r in range(self.page_directory.num_records):
             s += "|"
             for c in range(self.num_columns):
                 rid = self.page_directory.get_column_value(r, Config.rid_column_idx)
                 if (rid != -1):
-                    v = self.page_directory.get_column_value(rid, c+Config.column_data_offset)
+                    v = self.page_directory.get_data_attribute(r, c)
                     s += f"{v: {nsp}}|"
+                    num_logical_records += 1
             s += "\n"
 
         # Bottom Bar
@@ -605,7 +611,7 @@ class Table:
             Whether or not the operation completed successfully
         """
         # Set the RID column value to -1 (invalid)
-        self.page_directory.set_column_value(rid, Config.rid_column_idx, -1, 0)
+        return self.page_directory.set_column_value(rid, Config.rid_column_idx, -1, 0)
         
     def close(self):
         # dump record data

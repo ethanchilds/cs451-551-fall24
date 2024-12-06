@@ -1,3 +1,7 @@
+# System Imports
+import time
+
+# Local Imports
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.wrapper import QueryWrapper
@@ -96,6 +100,9 @@ class Transaction:
 
         # Release all held locks
         self.__release_all()
+
+        # Force a context switch
+        time.sleep(1e-4)
 
         return (False if not failure else None)
 

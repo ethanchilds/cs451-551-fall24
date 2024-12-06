@@ -63,7 +63,6 @@ def main():
         suite.addTests(loader.loadTestsFromTestCase(TestMergeThread))
         suite.addTest(loader.loadTestsFromTestCase(TestLinkedList))
         
-
     # Run the tests
     runner = unittest.TextTestRunner()
     runner.run(suite)
