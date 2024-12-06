@@ -76,6 +76,8 @@ class Query:
         # for each column: if the last base page is at full capacity -> add a new base page
 
         # Verify that the primary key doesn't exist already
+        if len(columns) != self.table.num_columns:
+            return False
 
         columns_values = [None] * (len(columns) + Config.column_data_offset)
 

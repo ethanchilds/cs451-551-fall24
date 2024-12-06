@@ -93,6 +93,14 @@ class QueryWrapper():
         lock = self.table.lock_manager.request(lock_type, unique_id, transaction)
         if lock == None:
             return False
+        
+        # request lock on primary key
+        for i in range(1, len(resources)):
+            lock_type, unique_id, transaction = resources[i]
+            lock = self.table.lock_manager.request(lock_type, unique_id, transaction)
+        
+            if lock == None:
+                return False
 
         # Update the query rid
         if self.query_function_type == Query.delete:
@@ -108,7 +116,7 @@ class QueryWrapper():
                 return None
             rid = rids[0]
             self.delete_rid = rid
-            self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx, )
+            self.update_schema = self.table.page_directory.get_column_value(rid, Config.schema_encoding_column_idx)
 
             for column in range(self.table.num_columns):
                 self.old_record[column] = self.table.page_directory.get_data_attribute(rid, column)
@@ -153,26 +161,29 @@ class QueryWrapper():
             # Write only that affects only one column
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             resources.append((Config.EXCLUSIVE_LOCK, (args[0], Config.rid_column_idx), self.transaction))
+            primary = args[0]
+            for i in range(self.table.num_columns + Config.column_data_offset):
+                resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
         elif self.query_function_type == Query.insert:
             primary = args[self.table.primary_key]
 
             # Write only on all columns
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
-            for i in range(len(args) + Config.column_data_offset):
+            for i in range(self.table.num_columns + Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
         elif self.query_function_type == Query.update:
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
-            columns = args[1:]
+            # TODO: Shared lock on RID to increase speed
 
             # As a record will need to be written in each column
             # an exclusive lock will eventually be needed on all columns
             # so just get exclusive instead of exclsuive and shared for 
             # the read operations
-            for i in range(len(columns)+Config.column_data_offset):
+            for i in range(self.table.num_columns+Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
         elif self.query_function_type == Query.select or self.query_function_type == Query.select_version:
@@ -181,6 +192,8 @@ class QueryWrapper():
 
             # read only on just the columns required in the select args
             resources.append((Config.SHARED_LOCK, ('Index'), self.transaction))
+            # just in case we want to get rid of phantom reads
+            # resources.append((Config.SHARED_LOCK, (primary, Config.rid_column_idx), self.transaction))
             for i in range(len(project_columns)):
                 if project_columns[i]:
                     resources.append((Config.SHARED_LOCK, (primary, i+Config.column_data_offset), self.transaction))
