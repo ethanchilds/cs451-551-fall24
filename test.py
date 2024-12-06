@@ -24,7 +24,25 @@ To add tests to automatic run do the following:
 
 2. Under main's else statement, add suite.addTests(loader.loadTestsFromTestCase(ExampleTest)),
 where ExampleTest is the new imported test class.
+
+3. To add test class to help command lt, add string test to TEST_LIST.
 """
+
+TEST_LIST = [
+    "TestIndexDataStructures", 
+    "TestBPlusTree", 
+    "TestNode", 
+    "TestQueue",
+    "TestBlock",
+    "TestLinkedList",
+    "TestPriorityQueue",
+    "TestLstoreIndex",
+    "TestLstoreDB",
+    "TestTransactionUndo",
+    "UltimateLstoreTest",
+    "TestMerge",
+    "TestMergeThread"
+    ]
 
 def main():
     # Argument parser for filtering test classes
@@ -33,7 +51,18 @@ def main():
         "-t", "--test",
         help="Specify a test class name (e.g., Example1Test) to run"
     )
+    parser.add_argument(
+        "-lt", "--list-tests",
+        action="store_true",  # Flag that doesn't require a value
+        help="List all available test classes and exit."
+    )
     args = parser.parse_args()
+
+    if args.list_tests:
+        print("Available tests:")
+        for test_name in TEST_LIST:
+            print(f"- {test_name}")
+        return
 
     # Create a test suite
     loader = unittest.TestLoader()
