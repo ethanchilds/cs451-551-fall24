@@ -722,7 +722,6 @@ class Table:
                         tail_flg=0,
                         cache_update=True
                     )
-            print("merge succeeds")
  
     def merge(self):
         self.__merge(tail_page_indices = [0, 1, 2])
