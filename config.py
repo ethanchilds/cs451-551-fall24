@@ -25,7 +25,9 @@ class Config:
     schema_encoding_column_idx = 3
     tps_and_brid_column_idx = 4
     benchmark_mode = False
-
+    merge_interval = 60
+    force_merge=False
+    
     # Lock types
     SHARED_LOCK = 0
     EXCLUSIVE_LOCK = 1

@@ -234,7 +234,7 @@ class Table:
     for individual records to be retrieved by value.
     """
 
-    def __init__(self, db_path, name, num_columns=None, primary_key=None, force_merge = True, merge_interval=30):
+    def __init__(self, db_path, name, num_columns=None, primary_key=None, force_merge=Config.force_merge, merge_interval=Config.merge_interval):
         """Initialize a Table
 
         Parameters
@@ -630,7 +630,8 @@ class Table:
         
 
     def __merge(self, tail_page_indices):
-        #print("merge is happening")
+        print("merge is running")
+        print(self.str_physical)
         # Which tail pages are going to be merged
         # This needs to be discussed
 
@@ -710,8 +711,6 @@ class Table:
                             cache_update=True
                         )
                         new_tps = tail_rid.read(j)
-                        # if new_tps == -1:
-                        #     print('HERE')
                         self.page_directory.set_column_value(rid, Config.tps_and_brid_column_idx, new_tps)
             
             # overwrite base page with new
@@ -725,6 +724,7 @@ class Table:
                         tail_flg=0,
                         cache_update=True
                     )
+            print("merge succeeds")
  
     def merge(self):
         self.__merge(tail_page_indices = [0, 1, 2])
