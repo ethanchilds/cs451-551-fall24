@@ -630,8 +630,6 @@ class Table:
         
 
     def __merge(self, tail_page_indices):
-        print("merge is running")
-        print(self.str_physical)
         # Which tail pages are going to be merged
         # This needs to be discussed
 
