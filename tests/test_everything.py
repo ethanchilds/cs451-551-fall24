@@ -441,7 +441,7 @@ class TestTransactionUndo(unittest.TestCase):
         self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
         self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
         self.txn.add_query(self.query.insert, self.table, *[0, 2, 0]) # PK already exists
-        self.assertFalse(self.txn.run())
+        self.assertTrue(self.txn.run() is None)
 
         self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
         self.assertEqual(self.index.column_items(1), [(0, 0)])
@@ -452,21 +452,29 @@ class TestTransactionUndo(unittest.TestCase):
         self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
         self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
         self.txn.add_query(self.query.delete, self.table, *[1]) # pk doesn't exist
-        self.assertFalse(self.txn.run())
+        self.assertTrue(self.txn.run() is None)
 
         self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
         self.assertEqual(self.index.column_items(1), [(0, 0)])
 
-    def test_bad_update(self):
+    def test_bad_update_non_unique_pk(self):
         self.query.insert(*[0, 0, 0])
 
         self.txn.add_query(self.query.insert, self.table, *[1, 1, 1])
         self.txn.add_query(self.query.update, self.table, *[1, *[2, 2, 2]])
         self.txn.add_query(self.query.update, self.table, *[0, *[2, 2, 2]]) # breaks unique pk contraint
-        self.assertFalse(self.txn.run())
+        self.assertTrue(self.txn.run() is None)
 
         self.assertEqual(list(self.table.column_iterator(1)), [(0, 0)])
         self.assertEqual(self.index.column_items(1), [(0, 0)])
+
+    def test_select_empty(self):
+        self.txn.add_query(self.query.insert, self.table, *[0, 0, 0])
+        self.txn.add_query(self.query.insert, self.table, *[0, 2, 0])
+        self.txn.add_query(self.query.select_version, self.table, *[1, 1, [True]*3, -5])
+        self.assertTrue(self.txn.run())
+        self.assertEqual(self.query.select(0, 1, [True]*3)[0].columns, [0, 0, 0])
+        print(self.query.select(0, 0, [True, True, True]))
 
     def test_two_inserts(self):
         self.txn.add_query(self.query.insert, self.table, *[111, 0, 222])
@@ -560,8 +568,11 @@ class TestTransactionUndo(unittest.TestCase):
 
         # The logical table should be exactly the same before and after txn2
         column_0_before_txn2 = list(self.table.column_iterator(0))
-        # print()
-        # print(column_0_before_txn2)
+        column_1_before_txn2 = list(self.table.column_iterator(1))
+        column_2_before_txn2 = list(self.table.column_iterator(2))
+        index_0_before_txn2 = self.index.column_items(0)
+        index_1_before_txn2 = self.index.column_items(1)
+        index_2_before_txn2 = self.index.column_items(2)
 
         self.txn2 = Transaction()
         for i in reversed(range(10)):
@@ -585,15 +596,21 @@ class TestTransactionUndo(unittest.TestCase):
             self.txn2.add_query(self.query.insert, self.table, *[i-1, i, i+1])
 
         self.run_txn_but_dont_commit(self.txn2)
-
-        # column_0_after_txn2 = list(self.table.column_iterator(0))
-        # print(column_0_after_txn2)
-
         self.txn2.abort()
 
         column_0_after_txn2_abort = list(self.table.column_iterator(0))
-        # print(column_0_after_txn2_abort)
+        column_1_after_txn2_abort = list(self.table.column_iterator(1))
+        column_2_after_txn2_abort = list(self.table.column_iterator(2))
+        index_0_after_txn2_abort = self.index.column_items(0)
+        index_1_after_txn2_abort = self.index.column_items(1)
+        index_2_after_txn2_abort = self.index.column_items(2)
+
         self.assertEqual(column_0_before_txn2, column_0_after_txn2_abort)             
+        self.assertEqual(column_1_before_txn2, column_1_after_txn2_abort)             
+        self.assertEqual(column_2_before_txn2, column_2_after_txn2_abort)
+        self.assertEqual(index_0_before_txn2, index_0_after_txn2_abort)             
+        self.assertEqual(index_1_before_txn2, index_1_after_txn2_abort)             
+        self.assertEqual(index_2_before_txn2, index_2_after_txn2_abort)             
         
 # class TestLstoreIndexUndo(unittest.TestCase):
 #     def setUp(self):
@@ -684,6 +701,7 @@ class UltimateLstoreTest(unittest.TestCase):
     def setUp(self):
         self.database = Database()
         self.table = self.database.create_table("Test Table", 3, 0)
+        self.index = self.table.index
         self.query = Query(self.table)
 
     def tearDown(self):
@@ -782,8 +800,8 @@ class UltimateLstoreTest(unittest.TestCase):
 
         number_of_records = len(list(self.table.column_iterator(0)))
         self.assertEqual(number_of_records, 0)
-        self.assertEqual(len(self.table.index.indices[0]), 0)
-        self.assertEqual(len(self.table.index.indices[1]), 0)
+        self.assertEqual(self.index.column_items(0), [])
+        self.assertEqual(self.index.column_items(1), [])
 
         self.assertTrue(self.query.insert(0, 10, 100))
 
@@ -823,13 +841,55 @@ class UltimateLstoreTest(unittest.TestCase):
         self.assertEqual(len(self.query.select(10, 2, [True, True, True])), 1)
 
 
-    
+class UltimateLstoreConcurrencyTest(unittest.TestCase):
+    def setUp(self):
+        db_path = './UltimateLstoreConcurrencyTest'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        tests_to_run = sys.argv[1:]
-        sys.argv = [sys.argv[0]]
-        suite = unittest.TestLoader().loadTestsFromNames(tests_to_run)
-        unittest.TextTestRunner().run(suite)
-    else:
-        unittest.main()
+        self.database = Database()
+        self.database.open(db_path)
+
+        self.table1 = self.database.create_table("Table 1", 3, 0)
+        self.table2 = self.database.create_table("Table 2", 4, 1)
+
+        self.index1 = self.table1.index
+        self.index2 = self.table2.index
+
+        self.query1 = Query(self.table1)
+        self.query2 = Query(self.table2)
+
+    def tearDown(self):
+        self.database.close()
+        db_path = './UltimateLstoreConcurrencyTest'
+        if (os.path.exists(db_path)):
+            shutil.rmtree(db_path, ignore_errors=True)
+
+    def test_everything_concurrently(self):
+        number_of_records_per_table = 1000
+        number_of_transactions = 2
+        number_of_operations_per_record = 3
+        num_threads = 8
+
+        for i in range(20):
+            if i % 2 == 0:
+                self.query1.insert(*[i//2, i*2, i%7])
+            else:
+                self.query2.insert(*[i%5, i//2, i*3, -i])
+
+        txn1 = Transaction()
+        txn1.add_query(self.query1.insert, self.table1, *[10, 10, 10])
+        txn1.add_query(self.query2.insert, self.table2, *[10, 10, 10, 10])
+        txn1.add_query(self.query2.insert, self.table2, *[10, 10, 10, 10])  # Invalid. What will the txn do next???
+        self.assertTrue(txn1.run() is None)
+
+        
+        
+        txn2 = Transaction()
+
+        # print(self.table1.str_physical(None, None))
+        # print(self.index1.column_items(0))
+        # print()
+        # print(self.table2.str_physical(None, None))
+        # print(self.index2.column_items(1))
+

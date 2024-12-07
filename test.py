@@ -5,7 +5,7 @@ from tests.test_queue import TestQueue
 from tests.test_block import TestBlock
 from tests.test_linked_list import TestLinkedList
 from tests.test_priorityqueue import TestPriorityQueue
-from tests.test_everything import TestLstoreIndex, TestLstoreDB, TestTransactionUndo, UltimateLstoreTest
+from tests.test_everything import TestLstoreIndex, TestLstoreDB, TestTransactionUndo, UltimateLstoreTest, UltimateLstoreConcurrencyTest
 from tests.mergeTest import TestMerge
 from tests.mergeThreadTest import TestMergeThread
 
@@ -40,6 +40,7 @@ TEST_LIST = [
     "TestLstoreDB",
     "TestTransactionUndo",
     "UltimateLstoreTest",
+    "UltimateLstoreConcurrencyTest",
     "TestMerge",
     "TestMergeThread"
     ]
@@ -92,6 +93,7 @@ def main():
         suite.addTest(loader.loadTestsFromTestCase(TestLinkedList))
         suite.addTests(loader.loadTestsFromTestCase(TestTransactionUndo))
         suite.addTests(loader.loadTestsFromTestCase(UltimateLstoreTest))
+        suite.addTests(loader.loadTestsFromTestCase(UltimateLstoreConcurrencyTest))
         
     # Run the tests
     runner = unittest.TextTestRunner()

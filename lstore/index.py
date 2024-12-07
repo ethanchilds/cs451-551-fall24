@@ -41,7 +41,7 @@ class Index:
 
     _consider_new_index
     """
-    def __init__(self, table, benchmark_mode=False, debug_mode=False, automatic_new_indexes=True):
+    def __init__(self, table, benchmark_mode=False, debug_mode=False, automatic_new_indexes=False):
         self.indices = [None] *  table.num_columns
         self.OrderedDataStructure = BPlusTree
         self.UnorderedDataStructure = HashMap

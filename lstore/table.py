@@ -46,7 +46,7 @@ class Record:
         return str(self.columns)
     
     def __repr__(self):
-        return str(self.columns)
+        return "Record(" + str(self.columns) + ")"
 
 class PageDirectory:
     """The PageDirectory controls access to different pages
