@@ -55,7 +55,7 @@ class QueryWrapper():
             self.delete_rid = None
 
         # in case of update roll back
-        if self.query_function_type == Query.update:
+        if self.query_function_type in [Query.update, Query.increment]:
             self.update_schema = None
             primary_key_location_in_args = self.table.primary_key + 1
             if self.args[primary_key_location_in_args] is None:
@@ -110,7 +110,7 @@ class QueryWrapper():
             self.delete_rid = rids[0]
 
         # update the query schema
-        elif self.query_function_type == Query.update:
+        elif self.query_function_type in [Query.update, Query.increment] :
             rids = self.table.index.locate(column=self.table.primary_key, value=self.args[0])
             if len(rids) != 1:
                 return None
@@ -166,7 +166,7 @@ class QueryWrapper():
             for i in range(self.table.num_columns + Config.column_data_offset):
                 resources.append((Config.EXCLUSIVE_LOCK, (primary, i), self.transaction))
 
-        elif self.query_function_type == Query.update:
+        elif self.query_function_type in [Query.update, Query.increment]:
             # IMPORTANT: In an update the exclusive lock might not always be needed
             resources.append((Config.EXCLUSIVE_LOCK, ('Index'), self.transaction))
             primary = args[0]
@@ -229,7 +229,7 @@ class QueryWrapper():
                 self.table.page_directory.set_column_value(rid, Config.rid_column_idx, -1)
                 self.index.maintain_delete(rid)
 
-            elif self.query_function_type == Query.update:                
+            elif self.query_function_type in [Query.update, Query.increment]:
                 # Get necessary data for roll back
                 rid = self.table.index.locate(column=self.table.primary_key, value = self.primary_key)[0]
 
