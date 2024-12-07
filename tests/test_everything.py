@@ -474,7 +474,7 @@ class TestTransactionUndo(unittest.TestCase):
         self.txn.add_query(self.query.select_version, self.table, *[1, 1, [True]*3, -5])
         self.assertTrue(self.txn.run())
         self.assertEqual(self.query.select(0, 1, [True]*3)[0].columns, [0, 0, 0])
-        print(self.query.select(0, 0, [True, True, True]))
+        # print(self.query.select(0, 0, [True, True, True]))
 
     def test_two_inserts(self):
         self.txn.add_query(self.query.insert, self.table, *[111, 0, 222])
@@ -495,7 +495,6 @@ class TestTransactionUndo(unittest.TestCase):
         self.txn.add_query(self.query.update, self.table, *[1, *[None, None, 1]])
         self.run_txn_but_dont_commit(self.txn)
 
-        print()
         self.assertEqual(self.index.column_items(1), [(1, 0)])
         self.assertEqual(list(self.table.column_iterator(1)), [(1, 0)])
         self.assertEqual(list(self.table.column_iterator(0)), [(1, 0)])
