@@ -44,11 +44,11 @@ if __name__ == "__main__":
         "utilities/",
         "config.py",
         "errors.py",
-        "mergeTest.py",
-        "mergeThreadTest.py",
-        "run_all_unit_tests.py",
-        "test_data_structures.py",
+        "mtest.py",
         "test.py",
-        "test.sh"
+        "test.sh",
+        "stress_test_concurrency_setup.py",
+        "stress_test_concurrency.py",
+        "stress_test_concurrency.sh"
     ]
     count_lines_of_code(included_paths)
